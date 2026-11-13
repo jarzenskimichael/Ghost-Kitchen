@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}Apply{% endblock %}{% block content %}
+<section class="page-hero compact"><p class="eyebrow">YOUR MONDAY STARTS HERE</p><h1>Apply to the<br><em>Ghost Kitchen.</em></h1><p>Tell us what you're building. Every application is reviewed by MVP; submitting this form does not reserve a date.</p></section>
+<section class="section form-section"><div class="form-intro"><h2>Business application</h2><p class="muted">Fields marked * are required. The introductory rental rate is <strong>${{ rental_rate }} per Monday</strong> (${{ rental_rate * 2 }} for two Mondays).</p></div>
+<form method="post" enctype="multipart/form-data" class="application-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="form-grid">
+<label>Business name *<input name="business_name" required value="{{ form.get('business_name','') }}"></label>
+<label>Owner / primary contact *<input name="owner_name" required value="{{ form.get('owner_name','') }}"></label>
+<label>Email address *<input type="email" name="email" required value="{{ form.get('email','') }}"></label>
+<label>Phone number *<input type="tel" name="phone" required value="{{ form.get('phone','') }}"></label>
+<label>Business type *<select name="business_type" required><option value="">Choose one</option>{% for t in ['Established restaurant / food business','Food truck','Caterer','Pop-up / market vendor','New food entrepreneur','Other'] %}<option {% if form.get('business_type')==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+<label>Website <input type="url" name="website" placeholder="https://"></label>
+<label class="full">Social media link(s)<input name="social_links" placeholder="Instagram, Facebook, TikTok, etc."></label>
+<label class="full">Tell us about your business *<textarea name="description" rows="3" required>{{ form.get('description','') }}</textarea></label>
+<label class="full">Describe your food concept *<textarea name="concept" rows="3" required>{{ form.get('concept','') }}</textarea></label>
+<label class="full">Proposed menu *<textarea name="menu" rows="5" required placeholder="List the items you plan to serve and brief descriptions.">{{ form.get('menu','') }}</textarea></label>
+<label class="full">Equipment and kitchen needs *<textarea name="equipment" rows="3" required placeholder="What equipment do you need? What will you bring?">{{ form.get('equipment','') }}</textarea></label>
+<label class="full">Food-service licensing *<textarea name="license_info" rows="2" required placeholder="Describe your current license / permit status. Do not upload sensitive license numbers here."></textarea></label>
+<label class="full">Insurance *<textarea name="insurance_info" rows="2" required placeholder="Describe your current business liability insurance status."></textarea></label>
+<label class="full">Food photos or sample menu (optional)<input type="file" name="food_photo" accept=".jpg,.jpeg,.png,.webp,.pdf"><small class="field-help">JPG, PNG, WEBP, or PDF · 12 MB maximum</small></label>
+<label class="full">Preferred two-Monday rotation<select name="preferred_rotation"><option value="">No preference / discuss with MVP</option>{% for r in rotations %}<option value="{{ r.id }}">{{ r.start_date.strftime('%B %-d') }} & {{ r.second_date.strftime('%B %-d, %Y') }}{% if r.application_id %} — currently assigned{% endif %}</option>{% endfor %}</select><small class="field-help">You may request an assigned date; MVP makes the final assignment.</small></label>
+</div>
+<div class="form-consent"><label class="check-label"><input type="checkbox" required> I understand this is an application, not a reservation, and that MVP must approve my business, menu, and dates.</label><label class="check-label"><input type="checkbox" required> I understand the introductory rental rate is ${{ rental_rate }} per Monday (${{ rental_rate * 2 }} for a two-Monday rotation), subject to final written terms.</label></div>
+<button class="button button-dark" type="submit">Submit application <span>→</span></button>
+</form></section>{% endblock %}

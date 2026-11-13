@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}A Kitchen for Your Next Chapter{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow">A CULINARY OPPORTUNITY FROM MVP</p>
+    <h1>Your food business.<br><em>A kitchen to grow in.</em></h1>
+    <p class="hero-lede">A real commercial kitchen, a Monday night of your own, and room to turn your idea into something bigger.</p>
+    <div class="hero-actions"><a class="button button-light" href="{{ url_for('main.apply') }}">Apply for a rotation <span>→</span></a><a class="text-link light-link" href="{{ url_for('main.how_it_works') }}">See how it works</a></div>
+    <div class="hero-note">ONE OPERATOR · TWO MONDAYS · YOUR OWN SERVICE</div>
+  </div>
+  <div class="hero-side"><div class="hero-stamp"><span>THE MVP</span><strong>GHOST<br>KITCHEN</strong><small>MAKE MONDAY YOURS</small></div></div>
+</section>
+<section class="intro section">
+  <div class="section-kicker">MORE THAN KITCHEN SPACE</div>
+  <div class="intro-grid"><h2>A place to start<br>without starting<br>from scratch.</h2><div><p class="large-copy">We believe good food deserves a chance to find its people. MVP's Ghost Kitchen gives food entrepreneurs the opportunity to operate from a commercial kitchen on select Mondays, introduce their concept to new customers, and build momentum.</p><p>Whether you're an established food business testing a new menu or an emerging entrepreneur ready for your first service, this is a chance to get cooking.</p></div></div>
+</section>
+<section class="dark-band"><div class="dark-band-inner"><div><p class="eyebrow">SIMPLE, EXCLUSIVE, FOCUSED</p><h2>One kitchen.<br>One operator.<br>Your Monday.</h2></div><div class="rate-card"><span>INTRODUCTORY RENTAL RATE</span><strong>${{ rental_rate }}</strong><small>PER MONDAY</small><hr><p>$ {{ rental_rate * 2 }} for a two-Monday rotation</p><small>No percentage of your sales.</small></div></div></section>
+<section class="section steps-section"><div class="section-kicker">HOW IT WORKS</div><h2>Four steps to your<br>first service.</h2><div class="step-grid"><article><b>01</b><h3>Apply</h3><p>Tell us about your business, food, menu, and what you need from the kitchen.</p></article><article><b>02</b><h3>Get reviewed</h3><p>MVP personally reviews every application. Submitting an application does not reserve a date.</p></article><article><b>03</b><h3>Get your dates</h3><p>Approved operators receive one exclusive two-Monday rotation.</p></article><article><b>04</b><h3>Make it yours</h3><p>Bring your ingredients, your team, and your customers. Run your own Monday service.</p></article></div><a class="button button-dark" href="{{ url_for('main.how_it_works') }}">Explore the program <span>→</span></a></section>
+<section class="section availability-section"><div class="section-kicker">PLAN AHEAD</div><div class="section-heading-row"><h2>Upcoming opportunities</h2><a class="text-link" href="{{ url_for('main.calendar') }}">View full calendar →</a></div><div class="rotation-grid">{% for r in upcoming %}<div class="rotation-card"><span>AVAILABLE ROTATION</span><strong>{{ r.start_date.strftime('%b %-d') }} <i>—</i> {{ r.second_date.strftime('%b %-d, %Y') }}</strong><small>Two consecutive Mondays</small></div>{% else %}<p>New dates are being prepared. Check back soon.</p>{% endfor %}</div></section>
+{% if featured %}<section class="section operator-section"><div class="section-heading-row"><div><div class="section-kicker">MEET THE COMMUNITY</div><h2>In the kitchen.</h2></div><a class="text-link" href="{{ url_for('main.operators') }}">Meet all operators →</a></div><div class="operator-grid">{% for p in featured %}<a class="operator-card" href="{{ url_for('main.operator_detail', application_id=p.id) }}"><span>FEATURED OPERATOR</span><h3>{{ p.business_name }}</h3><p>{{ p.description[:150] }}{% if p.description|length > 150 %}…{% endif %}</p></a>{% endfor %}</div></section>{% endif %}
+<section class="cta"><p class="eyebrow">YOUR NEXT CHAPTER STARTS HERE</p><h2>Ready to make<br>Monday yours?</h2><a class="button button-light" href="{{ url_for('main.apply') }}">Start your application →</a></section>
+{% endblock %}

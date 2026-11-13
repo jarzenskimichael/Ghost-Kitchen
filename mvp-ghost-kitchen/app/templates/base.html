@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A commercial kitchen opportunity from Merriman Valley Pizza.">
+  <title>{% block title %}MVP Ghost Kitchen{% endblock %} | {{ business_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="{{ url_for('main.home') }}"><span class="brand-mark">MVP</span><span>GHOST KITCHEN<small>BY MERRIMAN VALLEY PIZZA</small></span></a>
+  <button class="menu-toggle" aria-label="Toggle navigation" onclick="document.querySelector('.nav').classList.toggle('open')">☰</button>
+  <nav class="nav">
+    <a href="{{ url_for('main.how_it_works') }}">How It Works</a>
+    <a href="{{ url_for('main.calendar') }}">Availability</a>
+    <a href="{{ url_for('main.operators') }}">Our Operators</a>
+    <a class="nav-apply" href="{{ url_for('main.apply') }}">Apply Now</a>
+    {% if session.get('admin_logged_in') %}<a href="{{ url_for('main.admin_dashboard') }}">Dashboard</a>{% endif %}
+  </nav>
+</header>
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}<div class="flash-wrap">{% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <div><strong>MVP GHOST KITCHEN</strong><p>A place to test, build, and grow your food business.</p></div>
+  <div class="footer-links"><a href="{{ url_for('main.how_it_works') }}">How it works</a><a href="{{ url_for('main.calendar') }}">Availability</a><a href="{{ url_for('main.apply') }}">Apply</a><a href="{{ url_for('main.admin_login') }}">Organizer login</a></div>
+  <small>© {{ business_name }} · Ghost Kitchen Program</small>
+</footer>
+<script>
+document.querySelectorAll('[data-confirm]').forEach(el => el.addEventListener('click', e => { if (!confirm(el.dataset.confirm)) e.preventDefault(); }));
+</script>
+</body></html>
