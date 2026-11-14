@@ -365,7 +365,7 @@ def admin_application(application_id):
                         f"for the two-Monday rotation beginning "
                         f"{rotation.start_date.strftime('%B %-d, %Y')} and continuing "
                         f"{rotation.second_date.strftime('%B %-d, %Y')}. The rental fee "
-                        f"is \${rental_rate() * 2} total. MVP will follow up with the "
+                        f"is ${rental_rate() * 2} total. MVP will follow up with the "
                         "remaining operating details and payment instructions.\n\n"
                         "Merriman Valley Pizza"
                     ),
