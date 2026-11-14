@@ -349,6 +349,8 @@ def admin_application(application_id):
                 flash("That rotation has already been assigned.", "error")
             else:
                 release_assigned_rotation(person)
+                # Flush the old assignment first because Rotation.application_id is unique.
+                db.session.flush()
                 rotation.application_id = person.id
                 rotation.status = "approved"
                 person.assigned_rotation_id = rotation.id
