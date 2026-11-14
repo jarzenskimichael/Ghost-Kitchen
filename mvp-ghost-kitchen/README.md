@@ -49,9 +49,9 @@ The local database is created automatically. It uses SQLite by default.
 
 ## Deploy to Render
 
-1. Create a new **private** GitHub repository named `mvp-ghost-kitchen`.
-2. Upload the contents of this ZIP to the repository root (not the containing folder).
-3. In Render, create a new Blueprint using the repository and its `render.yaml`, or create a Python web service manually.
+1. Keep the GitHub repository private. This project currently lives in the `Ghost-Kitchen` repository; change its visibility under **Settings → General → Danger Zone → Change repository visibility** if it is still public.
+2. The application files live in `mvp-ghost-kitchen/`. The root-level `render.yaml` already sets Render's `rootDir` to that folder.
+3. In Render, use the repository's root-level `render.yaml` to create or update the Blueprint. If configuring an existing web service manually, set its **Root Directory** to `mvp-ghost-kitchen` so `requirements.txt` and `wsgi.py` are found.
 4. Configure the environment variables:
    - `SECRET_KEY`: long random secret
    - `ADMIN_PASSWORD`: strong organizer password
