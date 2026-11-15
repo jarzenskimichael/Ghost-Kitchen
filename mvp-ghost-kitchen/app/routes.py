@@ -11,7 +11,7 @@ from flask import (
     url_for, flash, session, abort, send_from_directory,
 )
 from app import db
-from app.models import Application, Rotation, Setting
+from app.models import Application, Rotation, RotationClosure, Setting
 
 bp = Blueprint("main", __name__)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
@@ -101,11 +101,12 @@ def ensure_rotations(months=15):
     db.session.commit()
 
 
-def get_rotation_choices():
+def get_rotation_choices(include_closed=False):
     ensure_rotations()
-    return Rotation.query.filter(
-        Rotation.start_date >= date.today()
-    ).order_by(Rotation.start_date).all()
+    query = Rotation.query.filter(Rotation.start_date >= date.today())
+    if not include_closed:
+        query = query.filter(~Rotation.closure.has())
+    return query.order_by(Rotation.start_date).all()
 
 
 def allowed_file(filename):
@@ -127,6 +128,7 @@ def home():
         Rotation.query.filter(
             Rotation.start_date >= date.today(),
             Rotation.application_id.is_(None),
+            ~Rotation.closure.has(),
         )
         .order_by(Rotation.start_date)
         .limit(4)
@@ -148,7 +150,7 @@ def how_it_works():
 
 @bp.route("/calendar")
 def calendar():
-    rotations = get_rotation_choices()
+    rotations = get_rotation_choices(include_closed=True)
     return render_template("calendar.html", rotations=rotations)
 
 
@@ -198,6 +200,7 @@ def apply():
             selected_rotation = Rotation.query.filter(
                 Rotation.id == preferred_id,
                 Rotation.start_date >= date.today(),
+                ~Rotation.closure.has(),
             ).first()
             if not selected_rotation:
                 flash("Please select a valid upcoming rotation.", "error")
@@ -338,6 +341,7 @@ def admin_application(application_id):
                 Rotation.query.filter(
                     Rotation.id == rotation_id,
                     Rotation.start_date >= date.today(),
+                    ~Rotation.closure.has(),
                 ).first()
                 if rotation_id is not None
                 else None
@@ -436,6 +440,45 @@ def admin_rotations():
     ensure_rotations(24)
     rotations = Rotation.query.order_by(Rotation.start_date).all()
     return render_template("admin_rotations.html", rotations=rotations)
+
+
+@bp.route("/admin/rotations/<int:rotation_id>/availability", methods=["POST"])
+@admin_required
+def update_rotation_availability(rotation_id):
+    rotation = Rotation.query.get_or_404(rotation_id)
+    action = request.form.get("action")
+
+    if rotation.start_date < date.today():
+        flash("Past rotations cannot be changed.", "error")
+        return redirect(url_for("main.admin_rotations"))
+
+    closure = RotationClosure.query.filter_by(rotation_id=rotation.id).first()
+    if action == "close":
+        if rotation.application_id:
+            flash("Clear the existing assignment before closing this rotation.", "error")
+        elif not closure:
+            reason = request.form.get("reason", "").strip()
+            db.session.add(
+                RotationClosure(
+                    rotation_id=rotation.id,
+                    reason=reason[:300] or None,
+                )
+            )
+            db.session.commit()
+            flash("Both Mondays in this rotation are now unavailable.", "success")
+        else:
+            flash("This rotation is already closed.", "error")
+    elif action == "reopen":
+        if closure:
+            db.session.delete(closure)
+            db.session.commit()
+            flash("This rotation is available for applications again.", "success")
+        else:
+            flash("This rotation is already open.", "error")
+    else:
+        abort(400)
+
+    return redirect(url_for("main.admin_rotations"))
 
 
 @bp.route("/admin/rotations/<int:rotation_id>/clear", methods=["POST"])
