@@ -159,6 +159,21 @@ def inject_globals():
     }
 
 
+@bp.route("/sms-opt-in")
+def sms_opt_in():
+    return render_template("sms_opt_in.html")
+
+
+@bp.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@bp.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+
 @bp.route("/")
 def home():
     ensure_rotations()
