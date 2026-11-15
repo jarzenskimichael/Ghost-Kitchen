@@ -28,4 +28,4 @@ jobs:
           cache: pip
           cache-dependency-path: mvp-ghost-kitchen/requirements.txt
       - run: pip install -r requirements.txt pytest
-      - run: pytest -q
+      - run: python -m pytest -q
