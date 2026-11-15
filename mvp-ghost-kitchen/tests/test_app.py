@@ -6,7 +6,10 @@ os.environ.setdefault("ADMIN_PASSWORD", "test-organizer-password")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 import pytest
+from unittest.mock import patch
+from urllib.parse import parse_qs
 from app import create_app, db
+from app.routes import send_sms
 from app.models import Application, Rotation, RotationClosure
 
 
@@ -215,3 +218,40 @@ def test_login_rejects_external_next_redirect(client):
     )
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/admin")
+
+
+
+def test_sms_sends_through_twilio_when_configured(app, monkeypatch):
+    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "AC123")
+    monkeypatch.setenv("TWILIO_AUTH_TOKEN", "test-token")
+    monkeypatch.setenv("TWILIO_FROM_NUMBER", "+15550000001")
+
+    with app.app_context():
+        with patch("app.routes.urllib.request.urlopen") as urlopen:
+            urlopen.return_value.__enter__.return_value.status = 201
+            assert send_sms(
+                "+15550000002",
+                "New Ghost Kitchen application",
+            ) is True
+
+    request = urlopen.call_args.args[0]
+    assert request.full_url.endswith("/Accounts/AC123/Messages.json")
+    payload = parse_qs(request.data.decode("utf-8"))
+    assert payload["To"] == ["+15550000002"]
+    assert payload["From"] == ["+15550000001"]
+    assert payload["Body"] == ["New Ghost Kitchen application"]
+
+
+def test_sms_is_skipped_when_twilio_is_not_configured(app, monkeypatch):
+    for key in (
+        "TWILIO_ACCOUNT_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_FROM_NUMBER",
+        "ORGANIZER_PHONE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    with app.app_context():
+        with patch("app.routes.urllib.request.urlopen") as urlopen:
+            assert send_sms("+15550000002", "Test") is False
+            urlopen.assert_not_called()
