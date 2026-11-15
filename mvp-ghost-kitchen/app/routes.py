@@ -439,7 +439,9 @@ def admin_application(application_id):
 def admin_rotations():
     ensure_rotations(24)
     rotations = Rotation.query.order_by(Rotation.start_date).all()
-    return render_template("admin_rotations.html", rotations=rotations)
+    return render_template(
+        "admin_rotations.html", rotations=rotations, today=date.today()
+    )
 
 
 @bp.route("/admin/rotations/<int:rotation_id>/availability", methods=["POST"])
