@@ -40,3 +40,19 @@ class Rotation(db.Model):
     status = db.Column(db.String(30), default="available", nullable=False)
 
     application = db.relationship("Application", foreign_keys=[application_id], uselist=False)
+    closure = db.relationship(
+        "RotationClosure", back_populates="rotation", uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+
+class RotationClosure(db.Model):
+    """Private organizer record marking a two-Monday rotation unavailable."""
+    id = db.Column(db.Integer, primary_key=True)
+    rotation_id = db.Column(
+        db.Integer, db.ForeignKey("rotation.id"), unique=True, nullable=False
+    )
+    reason = db.Column(db.String(300))
+    closed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    rotation = db.relationship("Rotation", back_populates="closure")
