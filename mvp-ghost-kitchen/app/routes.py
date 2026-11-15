@@ -1,6 +1,9 @@
 import os
 import secrets
 import smtplib
+import urllib.parse
+import urllib.request
+from base64 import b64encode
 from email.message import EmailMessage
 from datetime import date, timedelta
 from functools import wraps
@@ -45,8 +48,43 @@ def send_notice(to_address, subject, body):
         return False
 
 
+def send_sms(to_number, body):
+    """Send an optional SMS through Twilio; never block an application submission."""
+    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    from_number = os.environ.get("TWILIO_FROM_NUMBER")
+    if not all((account_sid, auth_token, from_number, to_number)):
+        return False
+
+    endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+    payload = urllib.parse.urlencode(
+        {"To": to_number, "From": from_number, "Body": body}
+    ).encode("utf-8")
+    credentials = b64encode(f"{account_sid}:{auth_token}".encode("utf-8")).decode("ascii")
+    sms_request = urllib.request.Request(
+        endpoint,
+        data=payload,
+        headers={
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(sms_request, timeout=12) as response:
+            return 200 <= response.status < 300
+    except Exception:
+        current_app.logger.exception("Unable to send Ghost Kitchen SMS notification")
+        return False
+
+
 def notify_organizer(subject, body):
     send_notice(os.environ.get("ORGANIZER_EMAIL"), subject, body)
+
+
+def notify_organizer_sms(body):
+    send_sms(os.environ.get("ORGANIZER_PHONE"), body)
 
 
 def release_assigned_rotation(person):
@@ -237,13 +275,18 @@ def apply():
         db.session.add(application)
         db.session.commit()
 
+        admin_url = url_for("main.admin_dashboard", _external=True)
         notify_organizer(
             f"New Ghost Kitchen application: {application.business_name}",
             (
                 f"A new application was submitted by {application.owner_name} "
                 f"({application.email}, {application.phone}). Review it in the "
-                "organizer dashboard."
+                f"organizer dashboard: {admin_url}"
             ),
+        )
+        notify_organizer_sms(
+            f"Ghost Kitchen: New application from {application.business_name} "
+            f"({application.owner_name}). Review: {admin_url}"
         )
         send_notice(
             application.email,
@@ -382,6 +425,10 @@ def admin_application(application_id):
                         f"{person.business_name} was approved for "
                         f"{rotation.start_date} and {rotation.second_date}."
                     ),
+                )
+                notify_organizer_sms(
+                    f"Ghost Kitchen: {person.business_name} was approved for "
+                    f"{rotation.start_date} and {rotation.second_date}."
                 )
                 flash("Application approved and rotation assigned.", "success")
                 return redirect(
