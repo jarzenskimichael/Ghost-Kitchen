@@ -767,6 +767,34 @@ def payment_status(application_id):
     return redirect(url_for("main.admin_application", application_id=person.id))
 
 
+@bp.route("/admin/applications/<int:application_id>/insurance", methods=["POST"])
+@admin_required
+def admin_update_insurance(application_id):
+    person = Application.query.get_or_404(application_id)
+    record = InsuranceRecord.query.filter_by(application_id=person.id).first()
+    if not record:
+        record = InsuranceRecord(application_id=person.id)
+        db.session.add(record)
+    record.carrier = request.form.get("insurance_carrier", "").strip() or None
+    record.policy_number = request.form.get("insurance_policy_number", "").strip() or None
+    record.coverage_amount = request.form.get("insurance_coverage", "").strip() or None
+    expires_value = request.form.get("insurance_expires_on", "").strip()
+    try:
+        record.expires_on = date.fromisoformat(expires_value) if expires_value else None
+    except ValueError:
+        flash("Enter a valid insurance expiration date.", "error")
+        return redirect(url_for("main.admin_application", application_id=person.id))
+    upload = request.files.get("insurance_certificate")
+    if upload and upload.filename:
+        if not allowed_file(upload.filename):
+            flash("Upload the certificate as PDF, JPG, PNG, or WEBP.", "error")
+            return redirect(url_for("main.admin_application", application_id=person.id))
+        record.certificate_filename = os.path.basename(upload.filename).replace("\\", "_")
+        record.certificate_data = upload.read()
+    db.session.commit()
+    flash("Insurance information updated.", "success")
+    return redirect(url_for("main.admin_application", application_id=person.id))
+
 @bp.route("/admin/applications/<int:application_id>/insurance-certificate")
 @admin_required
 def admin_insurance_certificate(application_id):
