@@ -72,6 +72,7 @@ class MondayRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     application_id = db.Column(db.Integer, db.ForeignKey("application.id"), nullable=False, index=True)
     slot_id = db.Column(db.Integer, db.ForeignKey("monday_slot.id"), nullable=False, index=True)
+    application = db.relationship("Application", backref=db.backref("monday_requests", lazy="select"))
     slot = db.relationship("MondaySlot")
     __table_args__ = (db.UniqueConstraint("application_id", "slot_id", name="uq_monday_request"),)
 
