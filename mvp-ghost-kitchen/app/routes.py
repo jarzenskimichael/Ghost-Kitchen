@@ -14,7 +14,7 @@ from flask import (
     url_for, flash, session, abort, send_from_directory,
 )
 from app import db
-from app.models import Application, Rotation, RotationClosure, Setting
+from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, Setting
 
 bp = Blueprint("main", __name__)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
@@ -147,6 +147,41 @@ def get_rotation_choices(include_closed=False):
     return query.order_by(Rotation.start_date).all()
 
 
+def ensure_monday_slots(months=24):
+    """Create individual Monday slots and migrate existing rotation assignments."""
+    today = date.today()
+    first = today + timedelta(days=(7 - today.weekday()) % 7)
+    end = today + timedelta(days=months * 31)
+    cursor = first
+    while cursor <= end:
+        if not MondaySlot.query.filter_by(monday_date=cursor).first():
+            db.session.add(MondaySlot(monday_date=cursor))
+        cursor += timedelta(days=7)
+    for legacy in Rotation.query.all():
+        for monday in (legacy.start_date, legacy.second_date):
+            slot = MondaySlot.query.filter_by(monday_date=monday).first()
+            if not slot:
+                slot = MondaySlot(monday_date=monday)
+                db.session.add(slot)
+                db.session.flush()
+            if legacy.application_id and not slot.application_id:
+                slot.application_id = legacy.application_id
+            if legacy.closure and not slot.closed_at:
+                slot.closure_reason = legacy.closure.reason
+                slot.closed_at = legacy.closure.closed_at
+    db.session.commit()
+
+def get_monday_slots(include_unavailable=True):
+    ensure_monday_slots()
+    query = MondaySlot.query.filter(MondaySlot.monday_date >= date.today())
+    if not include_unavailable:
+        query = query.filter(MondaySlot.application_id.is_(None), MondaySlot.closed_at.is_(None))
+    return query.order_by(MondaySlot.monday_date).all()
+
+def release_monday_assignments(person):
+    for slot in MondaySlot.query.filter_by(application_id=person.id).all():
+        slot.application_id = None
+
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -203,8 +238,8 @@ def how_it_works():
 
 @bp.route("/calendar")
 def calendar():
-    rotations = get_rotation_choices(include_closed=True)
-    return render_template("calendar.html", rotations=rotations)
+    monday_slots = get_monday_slots()
+    return render_template("calendar.html", monday_slots=monday_slots)
 
 
 @bp.route("/operators")
@@ -227,7 +262,7 @@ def operator_detail(application_id):
 
 @bp.route("/apply", methods=["GET", "POST"])
 def apply():
-    choices = get_rotation_choices()
+    choices = get_monday_slots(include_unavailable=False)
     if request.method == "POST":
         required = [
             "business_name", "owner_name", "email", "phone", "business_type",
