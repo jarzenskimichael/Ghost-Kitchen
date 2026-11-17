@@ -1,4 +1,5 @@
 import os
+from io import BytesIO
 from datetime import date, timedelta
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
@@ -10,7 +11,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs
 from app import create_app, db
 from app.routes import send_sms
-from app.models import Application, Rotation, RotationClosure
+from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord
 
 
 @pytest.fixture()
@@ -255,3 +256,64 @@ def test_sms_is_skipped_when_twilio_is_not_configured(app, monkeypatch):
         with patch("app.routes.urllib.request.urlopen") as urlopen:
             assert send_sms("+15550000002", "Test") is False
             urlopen.assert_not_called()
+
+
+def test_single_monday_application_approval_and_insurance_certificate(app, client):
+    with app.app_context():
+        first_date = date.today() + timedelta(days=(7 - date.today().weekday()) % 7 or 7)
+        second_date = first_date + timedelta(days=7)
+        first = MondaySlot(monday_date=first_date)
+        second = MondaySlot(monday_date=second_date)
+        db.session.add_all([first, second])
+        db.session.commit()
+        first_id, second_id = first.id, second.id
+
+    response = client.post(
+        "/apply",
+        data={
+            "business_name": "One Monday Dumplings",
+            "owner_name": "Test Owner",
+            "email": "one@example.com",
+            "phone": "3305550101",
+            "business_type": "Food truck",
+            "description": "A test business",
+            "concept": "Dumplings",
+            "menu": "Dumplings",
+            "equipment": "Steamers",
+            "license_info": "Licensed",
+            "insurance_info": "General liability coverage",
+            "insurance_carrier": "Test Mutual",
+            "insurance_policy_number": "POL-123",
+            "insurance_coverage": "$1,000,000",
+            "insurance_expires_on": "2027-12-31",
+            "preferred_mondays": [str(first_id)],
+            "insurance_certificate": (BytesIO(b"test certificate"), "certificate.pdf"),
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 302
+    with app.app_context():
+        person = Application.query.filter_by(business_name="One Monday Dumplings").one()
+        assert MondayRequest.query.filter_by(application_id=person.id, slot_id=first_id).count() == 1
+        insurance = InsuranceRecord.query.filter_by(application_id=person.id).one()
+        assert insurance.carrier == "Test Mutual"
+        assert insurance.policy_number == "POL-123"
+        assert insurance.certificate_data == b"test certificate"
+        person_id = person.id
+
+    login(client)
+    response = client.post(
+        f"/admin/applications/{person_id}",
+        data={"action": "approve", "monday_slot_ids": [str(first_id)], "published": "yes"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with app.app_context():
+        first = db.session.get(MondaySlot, first_id)
+        second = db.session.get(MondaySlot, second_id)
+        person = db.session.get(Application, person_id)
+        assert first.application_id == person_id
+        assert second.application_id is None
+        assert person.assigned_rotation_id is None
+        assert person.status == "approved"
+    assert client.get(f"/admin/applications/{person_id}/insurance-certificate").data == b"test certificate"
