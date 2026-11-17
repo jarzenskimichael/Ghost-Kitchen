@@ -288,6 +288,24 @@ def apply():
             flash("A Monday can only be selected once.", "error")
             return render_template("apply.html", monday_slots=choices, form=request.form)
         selected_slots = []
+        legacy_preference = request.form.get("preferred_rotation", "").strip()
+        if legacy_preference and not selected_ids:
+            try:
+                legacy_id = int(legacy_preference)
+            except (TypeError, ValueError):
+                legacy_id = None
+            legacy_rotation = Rotation.query.filter_by(id=legacy_id).first() if legacy_id else None
+            if not legacy_rotation or legacy_rotation.closure:
+                flash("Please select a valid available Monday date.", "error")
+                return render_template("apply.html", monday_slots=choices, form=request.form)
+            selected_slots = MondaySlot.query.filter(
+                MondaySlot.monday_date.in_([legacy_rotation.start_date, legacy_rotation.second_date]),
+                MondaySlot.application_id.is_(None),
+                MondaySlot.closed_at.is_(None),
+            ).all()
+            if len(selected_slots) != 2:
+                flash("One or both Mondays in that legacy rotation are unavailable.", "error")
+                return render_template("apply.html", monday_slots=choices, form=request.form)
         if selected_ids:
             selected_slots = MondaySlot.query.filter(
                 MondaySlot.id.in_(selected_ids),
