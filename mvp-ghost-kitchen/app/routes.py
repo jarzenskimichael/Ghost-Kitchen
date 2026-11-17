@@ -1,4 +1,6 @@
 import os
+import mimetypes
+from io import BytesIO
 import secrets
 import smtplib
 import urllib.parse
@@ -11,7 +13,7 @@ from urllib.parse import urlsplit
 
 from flask import (
     Blueprint, current_app, render_template, request, redirect,
-    url_for, flash, session, abort, send_from_directory,
+    url_for, flash, session, abort, send_from_directory, send_file,
 )
 from app import db
 from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, Setting
@@ -356,9 +358,10 @@ def apply():
                 db.session.rollback()
                 flash("Please upload the insurance certificate as PDF, JPG, PNG, or WEBP.", "error")
                 return render_template("apply.html", monday_slots=choices, form=request.form)
-            insurance_extension = insurance_upload.filename.rsplit(".", 1)[1].lower()
-            insurance_filename = secrets.token_hex(16) + "." + insurance_extension
-            insurance_upload.save(os.path.join(current_app.config["UPLOAD_FOLDER"], insurance_filename))
+            insurance_filename = os.path.basename(insurance_upload.filename).replace("\\", "_")
+            insurance_data = insurance_upload.read()
+        else:
+            insurance_data = None
         expires_value = request.form.get("insurance_expires_on", "").strip()
         try:
             expires_on = date.fromisoformat(expires_value) if expires_value else None
@@ -373,6 +376,7 @@ def apply():
             coverage_amount=request.form.get("insurance_coverage", "").strip() or None,
             expires_on=expires_on,
             certificate_filename=insurance_filename,
+            certificate_data=insurance_data,
         ))
         db.session.commit()
 
@@ -761,6 +765,17 @@ def payment_status(application_id):
     db.session.commit()
     flash("Payment status updated.", "success")
     return redirect(url_for("main.admin_application", application_id=person.id))
+
+
+@bp.route("/admin/applications/<int:application_id>/insurance-certificate")
+@admin_required
+def admin_insurance_certificate(application_id):
+    record = InsuranceRecord.query.filter_by(application_id=application_id).first_or_404()
+    if not record.certificate_data:
+        abort(404)
+    filename = record.certificate_filename or "insurance-certificate"
+    mimetype = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return send_file(BytesIO(record.certificate_data), mimetype=mimetype, download_name=filename, as_attachment=False)
 
 
 @bp.route("/admin/uploads/<filename>")
