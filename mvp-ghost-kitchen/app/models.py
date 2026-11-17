@@ -84,5 +84,6 @@ class InsuranceRecord(db.Model):
     coverage_amount = db.Column(db.String(80))
     expires_on = db.Column(db.Date)
     certificate_filename = db.Column(db.String(255))
+    certificate_data = db.Column(db.LargeBinary)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     application = db.relationship("Application", backref=db.backref("insurance_record", uselist=False))
