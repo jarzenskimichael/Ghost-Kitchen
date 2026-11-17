@@ -275,24 +275,29 @@ def apply():
         ]
         if missing:
             flash("Please complete all required fields.", "error")
-            return render_template("apply.html", rotations=choices, form=request.form)
+            return render_template("apply.html", monday_slots=choices, form=request.form)
 
-        preferred = request.form.get("preferred_rotation", "").strip()
-        if preferred:
-            try:
-                preferred_id = int(preferred)
-            except (TypeError, ValueError):
-                flash("Please select a valid rotation.", "error")
-                return render_template("apply.html", rotations=choices, form=request.form)
-
-            selected_rotation = Rotation.query.filter(
-                Rotation.id == preferred_id,
-                Rotation.start_date >= date.today(),
-                ~Rotation.closure.has(),
-            ).first()
-            if not selected_rotation:
-                flash("Please select a valid upcoming rotation.", "error")
-                return render_template("apply.html", rotations=choices, form=request.form)
+        raw_monday_ids = request.form.getlist("preferred_mondays")
+        try:
+            selected_ids = [int(value) for value in raw_monday_ids]
+        except (TypeError, ValueError):
+            selected_ids = []
+            flash("Please select valid Monday dates.", "error")
+            return render_template("apply.html", monday_slots=choices, form=request.form)
+        if len(selected_ids) != len(set(selected_ids)):
+            flash("A Monday can only be selected once.", "error")
+            return render_template("apply.html", monday_slots=choices, form=request.form)
+        selected_slots = []
+        if selected_ids:
+            selected_slots = MondaySlot.query.filter(
+                MondaySlot.id.in_(selected_ids),
+                MondaySlot.monday_date >= date.today(),
+                MondaySlot.application_id.is_(None),
+                MondaySlot.closed_at.is_(None),
+            ).all()
+            if len(selected_slots) != len(selected_ids):
+                flash("One or more selected Mondays are no longer available. Please choose again.", "error")
+                return render_template("apply.html", monday_slots=choices, form=request.form)
 
         photo_name = None
         upload = request.files.get("food_photo")
@@ -319,10 +324,38 @@ def apply():
             equipment=request.form["equipment"].strip(),
             license_info=request.form["license_info"].strip(),
             insurance_info=request.form["insurance_info"].strip(),
-            preferred_rotation=preferred or None,
+            preferred_rotation=None,
             photo_filename=photo_name,
         )
         db.session.add(application)
+        db.session.flush()
+        for slot in selected_slots:
+            db.session.add(MondayRequest(application_id=application.id, slot_id=slot.id))
+        insurance_upload = request.files.get("insurance_certificate")
+        insurance_filename = None
+        if insurance_upload and insurance_upload.filename:
+            if not allowed_file(insurance_upload.filename):
+                db.session.rollback()
+                flash("Please upload the insurance certificate as PDF, JPG, PNG, or WEBP.", "error")
+                return render_template("apply.html", monday_slots=choices, form=request.form)
+            insurance_extension = insurance_upload.filename.rsplit(".", 1)[1].lower()
+            insurance_filename = secrets.token_hex(16) + "." + insurance_extension
+            insurance_upload.save(os.path.join(current_app.config["UPLOAD_FOLDER"], insurance_filename))
+        expires_value = request.form.get("insurance_expires_on", "").strip()
+        try:
+            expires_on = date.fromisoformat(expires_value) if expires_value else None
+        except ValueError:
+            db.session.rollback()
+            flash("Enter a valid insurance expiration date.", "error")
+            return render_template("apply.html", monday_slots=choices, form=request.form)
+        db.session.add(InsuranceRecord(
+            application_id=application.id,
+            carrier=request.form.get("insurance_carrier", "").strip() or None,
+            policy_number=request.form.get("insurance_policy_number", "").strip() or None,
+            coverage_amount=request.form.get("insurance_coverage", "").strip() or None,
+            expires_on=expires_on,
+            certificate_filename=insurance_filename,
+        ))
         db.session.commit()
 
         admin_url = url_for("main.admin_dashboard", _external=True)
@@ -355,7 +388,7 @@ def apply():
         )
         return redirect(url_for("main.apply"))
 
-    return render_template("apply.html", rotations=choices, form={})
+    return render_template("apply.html", monday_slots=choices, form={})
 
 
 @bp.route("/admin/login", methods=["GET", "POST"])
