@@ -28,7 +28,7 @@ class Application(db.Model):
     admin_notes = db.Column(db.Text)
     assigned_rotation_id = db.Column(db.Integer, db.ForeignKey("rotation.id"))
     assigned_rotation = db.relationship("Rotation", foreign_keys=[assigned_rotation_id], uselist=False)
-    monday_slots = db.relationship("MondaySlot", back_populates="application")
+
     payment_status = db.Column(db.String(30), default="unpaid", nullable=False)
     agreement_filename = db.Column(db.String(255))
     published = db.Column(db.Boolean, default=False, nullable=False)
@@ -57,20 +57,3 @@ class RotationClosure(db.Model):
     closed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     rotation = db.relationship("Rotation", back_populates="closure")
-
-
-class MondaySlot(db.Model):
-    """An independently bookable Monday service date."""
-    id = db.Column(db.Integer, primary_key=True)
-    monday_date = db.Column(db.Date, unique=True, nullable=False, index=True)
-    application_id = db.Column(db.Integer, db.ForeignKey("application.id"), nullable=True)
-    application = db.relationship("Application", back_populates="monday_slots")
-    closure = db.relationship("MondayClosure", back_populates="slot", uselist=False, cascade="all, delete-orphan")
-
-
-class MondayClosure(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    slot_id = db.Column(db.Integer, db.ForeignKey("monday_slot.id"), unique=True, nullable=False)
-    reason = db.Column(db.String(300))
-    closed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    slot = db.relationship("MondaySlot", back_populates="closure")
