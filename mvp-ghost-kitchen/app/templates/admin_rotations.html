@@ -1,1 +1,23 @@
-{% extends "base.html" %}{% block title %}Manage Rotations{% endblock %}{% block content %}<section class="admin-wrap"><div class="admin-top"><div><p class="eyebrow">PRIVATE ORGANIZER AREA</p><h1>Rotation calendar</h1><p class="muted">Each block contains two consecutive Mondays.</p></div><a class="text-link" href="{{ url_for('main.admin_logout') }}">Log out</a></div><div class="admin-nav"><a href="{{ url_for('main.admin_dashboard') }}">Applications</a><a class="active" href="{{ url_for('main.admin_rotations') }}">Rotations</a><a href="{{ url_for('main.admin_settings') }}">Settings</a></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>First Monday</th><th>Second Monday</th><th>Assignment</th><th>Status</th><th>Action</th></tr></thead><tbody>{% for r in rotations %}<tr><td>{{ r.start_date.strftime('%A, %B %-d, %Y') }}</td><td>{{ r.second_date.strftime('%A, %B %-d, %Y') }}</td><td>{% if r.application %}<a href="{{ url_for('main.admin_application', application_id=r.application.id) }}">{{ r.application.business_name }}</a>{% else %}—{% endif %}</td><td><span class="status-pill {{ 'approved' if r.application else 'available' }}">{{ 'Assigned' if r.application else 'Available' }}</span></td><td>{% if r.application %}<form method="post" action="{{ url_for('main.clear_rotation', rotation_id=r.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="table-link" data-confirm="Clear this assignment?">Clear assignment</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Monday Availability{% endblock %}
+{% block content %}
+<section class="admin-wrap">
+  <div class="admin-top"><div><p class="eyebrow">PRIVATE ORGANIZER AREA</p><h1>Monday availability</h1><p class="muted">Each Monday is managed independently. Closing one date does not affect any other Monday.</p></div><a class="text-link" href="{{ url_for('main.admin_logout') }}">Log out</a></div>
+  <div class="admin-nav"><a href="{{ url_for('main.admin_dashboard') }}">Applications</a><a class="active" href="{{ url_for('main.admin_rotations') }}">Mondays</a><a href="{{ url_for('main.admin_settings') }}">Settings</a></div>
+  <div class="admin-table-wrap"><table class="admin-table">
+    <thead><tr><th>Monday</th><th>Assignment</th><th>Status</th><th>Organizer action</th></tr></thead>
+    <tbody>{% for slot in monday_slots %}
+      <tr><td>{{ slot.monday_date.strftime('%A, %B %-d, %Y') }}</td>
+      <td>{% if slot.application %}<a href="{{ url_for('main.admin_application', application_id=slot.application.id) }}">{{ slot.application.business_name }}</a>{% else %}—{% endif %}</td>
+      <td>{% if slot.closed_at %}<span class="status-pill rejected">Unavailable</span>{% if slot.closure_reason %}<small class="field-help">Private note: {{ slot.closure_reason }}</small>{% endif %}{% elif slot.application %}<span class="status-pill approved">Assigned</span>{% else %}<span class="status-pill available">Available</span>{% endif %}</td>
+      <td>{% if slot.closed_at %}
+        <form method="post" action="{{ url_for('main.update_monday_availability', slot_id=slot.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="reopen"><button class="table-link" type="submit">Reopen Monday</button></form>
+      {% elif slot.application %}
+        <form method="post" action="{{ url_for('main.clear_monday_slot', slot_id=slot.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="table-link" type="submit" data-confirm="Clear this Monday assignment?">Clear assignment</button></form>
+      {% elif slot.monday_date >= today %}
+        <form method="post" action="{{ url_for('main.update_monday_availability', slot_id=slot.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="close"><input name="reason" maxlength="300" placeholder="Optional private note" aria-label="Private closure note"><button class="table-link" type="submit" data-confirm="Make this Monday unavailable?">Close Monday</button></form>
+      {% else %}<span class="muted">Past date</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="4">No Mondays scheduled.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}
