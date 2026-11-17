@@ -317,3 +317,22 @@ def test_single_monday_application_approval_and_insurance_certificate(app, clien
         assert person.assigned_rotation_id is None
         assert person.status == "approved"
     assert client.get(f"/admin/applications/{person_id}/insurance-certificate").data == b"test certificate"
+    update_response = client.post(
+        f"/admin/applications/{person_id}/insurance",
+        data={
+            "insurance_carrier": "Updated Mutual",
+            "insurance_policy_number": "POL-456",
+            "insurance_coverage": "$2,000,000",
+            "insurance_expires_on": "2028-12-31",
+            "insurance_certificate": (BytesIO(b"updated certificate"), "updated.pdf"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert update_response.status_code == 200
+    assert client.get(f"/admin/applications/{person_id}/insurance-certificate").data == b"updated certificate"
+    with app.app_context():
+        insurance = InsuranceRecord.query.filter_by(application_id=person_id).one()
+        assert insurance.carrier == "Updated Mutual"
+        assert insurance.policy_number == "POL-456"
+        assert insurance.certificate_data == b"updated certificate"
