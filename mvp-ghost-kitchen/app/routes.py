@@ -636,6 +636,12 @@ def update_monday_availability(slot_id):
     elif action == "reopen":
         slot.closure_reason = None
         slot.closed_at = None
+        # Remove legacy paired-date closures so migration never recloses this slot.
+        for legacy in Rotation.query.filter(
+            (Rotation.start_date == slot.monday_date) | (Rotation.second_date == slot.monday_date)
+        ).all():
+            if legacy.closure:
+                db.session.delete(legacy.closure)
         db.session.commit()
         flash("Monday reopened.", "success")
     else:
@@ -650,7 +656,14 @@ def clear_monday_slot(slot_id):
     if slot.application_id:
         person = Application.query.get(slot.application_id)
         slot.application_id = None
-        if person and not MondaySlot.query.filter_by(application_id=person.id).filter(MondaySlot.id != slot.id).first() and not person.assigned_rotation_id:
+        # Break a legacy paired rotation link; keep the neighboring Monday assigned.
+        if person and person.assigned_rotation_id:
+            legacy = Rotation.query.get(person.assigned_rotation_id)
+            if legacy and legacy.application_id == person.id:
+                legacy.application_id = None
+                legacy.status = "available"
+            person.assigned_rotation_id = None
+        if person and not MondaySlot.query.filter_by(application_id=person.id).filter(MondaySlot.id != slot.id).first():
             person.status = "pending"
             person.published = False
     db.session.commit()
