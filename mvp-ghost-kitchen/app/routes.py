@@ -594,6 +594,10 @@ def admin_application(application_id):
         elif action == "save":
             pass
 
+        elif action == "approve":
+            # Approval was submitted without a valid date selection.
+            pass
+
         else:
             abort(400)
 
