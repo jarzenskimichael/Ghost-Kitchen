@@ -600,11 +600,50 @@ def admin_application(application_id):
 @bp.route("/admin/rotations")
 @admin_required
 def admin_rotations():
-    ensure_rotations(24)
-    rotations = Rotation.query.order_by(Rotation.start_date).all()
-    return render_template(
-        "admin_rotations.html", rotations=rotations, today=date.today()
-    )
+    monday_slots = get_monday_slots()
+    return render_template("admin_rotations.html", monday_slots=monday_slots, today=date.today())
+
+
+@bp.route("/admin/mondays/<int:slot_id>/availability", methods=["POST"])
+@admin_required
+def update_monday_availability(slot_id):
+    slot = MondaySlot.query.get_or_404(slot_id)
+    action = request.form.get("action")
+    if slot.monday_date < date.today():
+        flash("Past Mondays cannot be changed.", "error")
+    elif action == "close":
+        if slot.application_id:
+            flash("Clear the assignment before closing this Monday.", "error")
+        elif not slot.closed_at:
+            from datetime import datetime
+            slot.closure_reason = request.form.get("reason", "").strip()[:300] or None
+            slot.closed_at = datetime.utcnow()
+            db.session.commit()
+            flash("Monday marked unavailable.", "success")
+    elif action == "reopen":
+        slot.closure_reason = None
+        slot.closed_at = None
+        db.session.commit()
+        flash("Monday reopened.", "success")
+    else:
+        abort(400)
+    return redirect(url_for("main.admin_rotations"))
+
+
+@bp.route("/admin/mondays/<int:slot_id>/clear", methods=["POST"])
+@admin_required
+def clear_monday_slot(slot_id):
+    slot = MondaySlot.query.get_or_404(slot_id)
+    if slot.application_id:
+        person = Application.query.get(slot.application_id)
+        slot.application_id = None
+        if person and not MondaySlot.query.filter_by(application_id=person.id).filter(MondaySlot.id != slot.id).first() and not person.assigned_rotation_id:
+            person.status = "pending"
+            person.published = False
+    db.session.commit()
+    flash("Monday assignment cleared.", "success")
+    return redirect(url_for("main.admin_rotations"))
+
 
 
 @bp.route("/admin/rotations/<int:rotation_id>/availability", methods=["POST"])
