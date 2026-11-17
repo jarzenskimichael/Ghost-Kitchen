@@ -304,7 +304,7 @@ def apply():
         if upload and upload.filename:
             if not allowed_file(upload.filename):
                 flash("Please upload a JPG, PNG, WEBP, or PDF file.", "error")
-                return render_template("apply.html", rotations=choices, form=request.form)
+                return render_template("apply.html", monday_slots=choices, form=request.form)
 
             extension = upload.filename.rsplit(".", 1)[1].lower()
             photo_name = secrets.token_hex(12) + "." + extension
@@ -485,7 +485,10 @@ def admin_application(application_id):
                 flash("Application approved and Monday date(s) assigned.", "success")
                 return redirect(url_for("main.admin_application", application_id=person.id))
 
-        if action == "approve" and not request.form.getlist("monday_slot_ids"):
+        if action == "approve" and not request.form.getlist("monday_slot_ids") and not request.form.get("rotation_id"):
+            flash("Select at least one Monday date before approving.", "error")
+
+        if action == "approve" and not request.form.getlist("monday_slot_ids") and request.form.get("rotation_id"):
             rotation_id = request.form.get("rotation_id", "").strip()
             try:
                 rotation_id = int(rotation_id)
