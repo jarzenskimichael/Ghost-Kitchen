@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Apply{% endblock %}{% block content %}
 <section class="page-hero compact"><p class="eyebrow">YOUR MONDAY STARTS HERE</p><h1>Apply to the<br><em>Ghost Kitchen.</em></h1><p>Tell us what you're building. Every application is reviewed by MVP; submitting this form does not reserve a date.</p></section>
-<section class="section form-section"><div class="form-intro"><h2>Business application</h2><p class="muted">Fields marked * are required. The introductory rental rate is <strong>${{ rental_rate }} per Monday</strong> (${{ rental_rate * 2 }} for two Mondays).</p></div>
+<section class="section form-section"><div class="form-intro"><h2>Business application</h2><p class="muted">Fields marked * are required. The introductory rental rate is <strong>${{ rental_rate }} per approved Monday</strong>.</p></div>
 <form method="post" enctype="multipart/form-data" class="application-form">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="form-grid">
@@ -25,6 +25,6 @@
 <label class="full">Food photos or sample menu (optional)<input type="file" name="food_photo" accept=".jpg,.jpeg,.png,.webp,.pdf"><small class="field-help">JPG, PNG, WEBP, or PDF · 12 MB maximum</small></label>
 <div class="full"><strong>Preferred Monday date(s)</strong><p class="field-help">Select one Monday or several. Each date is considered separately and is not reserved until MVP approves it.</p><div class="date-choice-list">{% for slot in monday_slots %}<label class="check-label"><input type="checkbox" name="preferred_mondays" value="{{ slot.id }}"> {{ slot.monday_date.strftime('%A, %B %-d, %Y') }}</label>{% else %}<p class="muted">No dates are currently available to request.</p>{% endfor %}</div></div>
 </div>
-<div class="form-consent"><label class="check-label"><input type="checkbox" required> I understand this is an application, not a reservation, and that MVP must approve my business, menu, and dates.</label><label class="check-label"><input type="checkbox" required> I understand the introductory rental rate is ${{ rental_rate }} per Monday (${{ rental_rate * 2 }} for a two-Monday rotation), subject to final written terms.</label></div>
+<div class="form-consent"><label class="check-label"><input type="checkbox" required> I understand this is an application, not a reservation, and that MVP must approve my business, menu, and dates.</label><label class="check-label"><input type="checkbox" required> I understand the introductory rental rate is ${{ rental_rate }} per approved Monday, subject to final written terms.</label></div>
 <button class="button button-dark" type="submit">Submit application <span>→</span></button>
 </form></section>{% endblock %}
