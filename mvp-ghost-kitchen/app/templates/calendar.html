@@ -1,38 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Availability{% endblock %}
 {% block content %}
-<section class="page-hero compact">
-  <p class="eyebrow">THE MONDAY CALENDAR</p>
-  <h1>Find your<br><em>two Mondays.</em></h1>
-  <p>Rotations are two consecutive Mondays. Dates are subject to final review and approval by MVP.</p>
-</section>
+<section class="page-hero compact"><p class="eyebrow">THE MONDAY CALENDAR</p><h1>Find your<br><em>Mondays.</em></h1><p>Each Monday is booked independently. Request one date or several; all dates are subject to review and approval by MVP.</p></section>
 <section class="section">
-  <div class="calendar-legend">
-    <span><i class="dot available"></i> Available</span>
-    <span><i class="dot booked"></i> Assigned</span>
-    <span><i class="dot unavailable"></i> Unavailable</span>
-  </div>
-  <div class="calendar-list">
-    {% for r in rotations %}
-      <div class="calendar-row">
-        <div class="calendar-date"><span>{{ r.start_date.strftime('%b') }}</span><strong>{{ r.start_date.strftime('%d') }}</strong></div>
-        <div class="calendar-date second"><span>{{ r.second_date.strftime('%b') }}</span><strong>{{ r.second_date.strftime('%d') }}</strong></div>
-        <div class="calendar-info">
-          <strong>{{ r.start_date.strftime('%A, %B %-d') }} & {{ r.second_date.strftime('%B %-d') }}</strong>
-          <small>Two consecutive Monday services</small>
-        </div>
-        {% if r.closure %}
-          <span class="status-pill rejected">Unavailable</span>
-        {% elif r.application_id %}
-          <span class="status-pill booked">Assigned</span>
-        {% else %}
-          <span class="status-pill available">Available to request</span>
-        {% endif %}
-      </div>
-    {% else %}
-      <p>No upcoming rotations are currently listed.</p>
-    {% endfor %}
-  </div>
+  <div class="calendar-legend"><span><i class="dot available"></i> Available</span><span><i class="dot booked"></i> Assigned</span><span><i class="dot unavailable"></i> Unavailable</span></div>
+  <div class="calendar-list">{% for slot in monday_slots %}
+    <div class="calendar-row"><div class="calendar-date"><span>{{ slot.monday_date.strftime('%b') }}</span><strong>{{ slot.monday_date.strftime('%d') }}</strong></div>
+      <div class="calendar-info"><strong>{{ slot.monday_date.strftime('%A, %B %-d, %Y') }}</strong><small>One Monday service</small></div>
+      {% if slot.closed_at %}<span class="status-pill rejected">Unavailable</span>{% elif slot.application_id %}<span class="status-pill booked">Assigned</span>{% else %}<span class="status-pill available">Available to request</span>{% endif %}
+    </div>
+  {% else %}<p>No upcoming Mondays are currently listed.</p>{% endfor %}</div>
   <p class="muted small">Availability can change while applications are being reviewed. A date is not yours until MVP confirms approval in writing.</p>
   <a class="button button-dark" href="{{ url_for('main.apply') }}">Request dates →</a>
 </section>
