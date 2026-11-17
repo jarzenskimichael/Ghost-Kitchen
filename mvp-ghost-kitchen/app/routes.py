@@ -467,7 +467,7 @@ def admin_application(application_id):
                 chosen_ids = [int(value) for value in request.form.getlist("monday_slot_ids")]
             except (TypeError, ValueError):
                 chosen_ids = []
-            selected = MondaySlot.query.filter(MondaySlot.id.in_(chosen_ids), MondaySlot.monday_date >= date.today()).all() if chosen_ids else []
+            selected = MondaySlot.query.filter(MondaySlot.id.in_(chosen_ids), MondaySlot.monday_date >= date.today()).with_for_update().all() if chosen_ids else []
             invalid = not chosen_ids or len(selected) != len(set(chosen_ids)) or any(slot.closed_at or slot.application_id not in (None, person.id) for slot in selected)
             if invalid:
                 flash("Select one or more available Mondays. Closed or assigned dates cannot be approved.", "error")
