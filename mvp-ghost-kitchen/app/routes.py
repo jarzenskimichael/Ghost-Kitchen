@@ -213,17 +213,7 @@ def terms():
 
 @bp.route("/")
 def home():
-    ensure_rotations()
-    upcoming = (
-        Rotation.query.filter(
-            Rotation.start_date >= date.today(),
-            Rotation.application_id.is_(None),
-            ~Rotation.closure.has(),
-        )
-        .order_by(Rotation.start_date)
-        .limit(4)
-        .all()
-    )
+    upcoming = get_monday_slots(include_unavailable=False)[:4]
     featured = (
         Application.query.filter_by(status="approved", published=True)
         .order_by(Application.created_at.desc())
@@ -451,20 +441,14 @@ def admin_logout():
 @bp.route("/admin")
 @admin_required
 def admin_dashboard():
-    ensure_rotations()
     applications = Application.query.order_by(Application.created_at.desc()).all()
     pending = [application for application in applications if application.status == "pending"]
-    upcoming = (
-        Rotation.query.filter(Rotation.start_date >= date.today())
-        .order_by(Rotation.start_date)
-        .limit(10)
-        .all()
-    )
+    upcoming = get_monday_slots()[:10]
     return render_template(
         "admin_dashboard.html",
         applications=applications,
         pending=pending,
-        rotations=upcoming,
+        monday_slots=upcoming,
     )
 
 
