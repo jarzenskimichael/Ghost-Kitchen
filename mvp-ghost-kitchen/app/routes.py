@@ -451,12 +451,41 @@ def admin_dashboard():
 def admin_application(application_id):
     person = Application.query.get_or_404(application_id)
     choices = get_rotation_choices()
+    monday_slots = get_monday_slots()
 
     if request.method == "POST":
         action = request.form.get("action")
         person.admin_notes = request.form.get("admin_notes", "").strip()
 
-        if action == "approve":
+        if action == "approve" and request.form.getlist("monday_slot_ids"):
+            try:
+                chosen_ids = [int(value) for value in request.form.getlist("monday_slot_ids")]
+            except (TypeError, ValueError):
+                chosen_ids = []
+            selected = MondaySlot.query.filter(MondaySlot.id.in_(chosen_ids), MondaySlot.monday_date >= date.today()).all() if chosen_ids else []
+            invalid = not chosen_ids or len(selected) != len(set(chosen_ids)) or any(slot.closed_at or slot.application_id not in (None, person.id) for slot in selected)
+            if invalid:
+                flash("Select one or more available Mondays. Closed or assigned dates cannot be approved.", "error")
+            else:
+                release_assigned_rotation(person)
+                release_monday_assignments(person)
+                db.session.flush()
+                for slot in selected:
+                    slot.application_id = person.id
+                person.assigned_rotation_id = None
+                person.status = "approved"
+                person.published = request.form.get("published") == "yes"
+                db.session.commit()
+                dates_text = ", ".join(slot.monday_date.strftime("%B %-d, %Y") for slot in selected)
+                total = rental_rate() * len(selected)
+                body = f"Hi {person.owner_name}, your application for {person.business_name} is approved for {dates_text}. Total rental: ${total} (${rental_rate()} per Monday)."
+                send_notice(person.email, "MVP Ghost Kitchen application approved", body)
+                notify_organizer(f"Approved: {person.business_name}", f"Dates: {dates_text}")
+                notify_organizer_sms(f"Ghost Kitchen: {person.business_name} approved for {dates_text}.")
+                flash("Application approved and Monday date(s) assigned.", "success")
+                return redirect(url_for("main.admin_application", application_id=person.id))
+
+        if action == "approve" and not request.form.getlist("monday_slot_ids"):
             rotation_id = request.form.get("rotation_id", "").strip()
             try:
                 rotation_id = int(rotation_id)
@@ -520,6 +549,7 @@ def admin_application(application_id):
 
         elif action == "reject":
             release_assigned_rotation(person)
+            release_monday_assignments(person)
             person.status = "rejected"
             send_notice(
                 person.email,
@@ -534,10 +564,12 @@ def admin_application(application_id):
 
         elif action == "waitlist":
             release_assigned_rotation(person)
+            release_monday_assignments(person)
             person.status = "waitlist"
 
         elif action == "request_info":
             release_assigned_rotation(person)
+            release_monday_assignments(person)
             person.status = "info_requested"
             send_notice(
                 person.email,
@@ -560,7 +592,8 @@ def admin_application(application_id):
         flash("Application updated.", "success")
 
     return render_template(
-        "admin_application.html", person=person, rotations=choices
+        "admin_application.html", person=person, rotations=choices, monday_slots=monday_slots,
+        requested_monday_ids={item.slot_id for item in MondayRequest.query.filter_by(application_id=person.id).all()}
     )
 
 
