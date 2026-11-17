@@ -456,7 +456,6 @@ def admin_dashboard():
 @admin_required
 def admin_application(application_id):
     person = Application.query.get_or_404(application_id)
-    choices = get_rotation_choices()
     monday_slots = get_monday_slots()
 
     if request.method == "POST":
@@ -605,7 +604,7 @@ def admin_application(application_id):
         flash("Application updated.", "success")
 
     return render_template(
-        "admin_application.html", person=person, rotations=choices, monday_slots=monday_slots,
+        "admin_application.html", person=person, monday_slots=monday_slots,
         requested_monday_ids={item.slot_id for item in MondayRequest.query.filter_by(application_id=person.id).all()}
     )
 
