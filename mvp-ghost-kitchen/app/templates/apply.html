@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block title %}Apply{% endblock %}{% block content %}
-<section class="page-hero compact"><p class="eyebrow">YOUR MONDAY STARTS HERE</p><h1>Apply to the<br><em>Ghost Kitchen.</em></h1><p>Tell us what you're building. Every application is reviewed by MVP; submitting this form does not reserve a date.</p></section>
+<section class="page-hero compact"><p class="eyebrow">YOUR MONDAY STARTS HERE</p><h1>Apply to the<br><em>Ghost Kitchen.</em></h1><p>Tell us what you're building. Applications are reviewed by Chef MJ's Feel Good BBQ LLC, the registered business operating the MVP Ghost Kitchen at Merriman Valley Pizza. Submitting this form does not reserve a date.</p></section>
 <section class="section form-section"><div class="form-intro"><h2>Business application</h2><p class="muted">Fields marked * are required. The introductory rental rate is <strong>${{ rental_rate }} per approved Monday</strong>.</p></div>
 <form method="post" enctype="multipart/form-data" class="application-form">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -7,7 +7,11 @@
 <label>Business name *<input name="business_name" required value="{{ form.get('business_name','') }}"></label>
 <label>Owner / primary contact *<input name="owner_name" required value="{{ form.get('owner_name','') }}"></label>
 <label>Email address *<input type="email" name="email" required value="{{ form.get('email','') }}"></label>
-<label>Phone number *<input type="tel" name="phone" required value="{{ form.get('phone','') }}"></label>
+<label>Phone number *<input type="tel" name="phone" required autocomplete="tel" value="{{ form.get('phone','') }}"></label>
+<div class="full form-consent sms-consent">
+<label class="check-label"><input type="checkbox" name="sms_consent" value="yes"> I agree to receive recurring automated text messages from <strong>Chef MJs Feel Good BBQ LLC</strong> about my MVP Ghost Kitchen application and scheduling updates at the mobile number I provided above. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is optional and is not a condition of applying, purchasing, or renting kitchen space.</label>
+<small class="field-help">This is optional and separate from your application. <a href="{{ url_for('main.sms_opt_in') }}">View SMS program details</a> · <a href="{{ url_for('main.privacy') }}">Privacy Policy</a> · <a href="{{ url_for('main.terms') }}">Terms &amp; Conditions</a>.</small>
+</div>
 <label>Business type *<select name="business_type" required><option value="">Choose one</option>{% for t in ['Established restaurant / food business','Food truck','Caterer','Pop-up / market vendor','New food entrepreneur','Other'] %}<option {% if form.get('business_type')==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
 <label>Website <input type="url" name="website" placeholder="https://"></label>
 <label class="full">Social media link(s)<input name="social_links" placeholder="Instagram, Facebook, TikTok, etc."></label>

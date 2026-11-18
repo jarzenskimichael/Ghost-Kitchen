@@ -381,3 +381,39 @@ def test_registered_campaign_brand_is_visible_in_site_header_and_footer(client):
     assert "CHEF MJ&#39;S FEEL GOOD BBQ" in page
     assert "Chef MJs Feel Good BBQ LLC" in page
     assert "Merriman Valley Pizza" in page
+
+
+def test_application_sms_consent_is_optional_and_bound_to_submitted_phone(app, client):
+    page = client.get("/apply").get_data(as_text=True)
+    assert 'name="phone"' in page
+    assert 'name="sms_consent"' in page
+    assert "Chef MJs Feel Good BBQ LLC" in page
+    assert "Consent is optional" in page
+
+    base_data = {
+        "business_name": "Consent Test Kitchen",
+        "owner_name": "Test Owner",
+        "email": "consent@example.com",
+        "phone": "(330) 555-0199",
+        "business_type": "Food truck",
+        "description": "A test business",
+        "concept": "Sandwiches",
+        "menu": "Sandwiches",
+        "equipment": "Standard equipment",
+        "license_info": "In progress",
+        "insurance_info": "Insured",
+    }
+    accepted = client.post("/apply", data={**base_data, "sms_consent": "yes"})
+    assert accepted.status_code == 302
+    with app.app_context():
+        consent = SmsConsent.query.filter_by(phone="+13305550199").one()
+        assert consent.active is True
+        assert consent.consent_source == "Ghost Kitchen application form"
+        assert consent.consent_text_version == "2026-11-18-application"
+
+    second_data = {**base_data, "business_name": "No Consent Kitchen", "email": "no-consent@example.com", "phone": "3305550188"}
+    response = client.post("/apply", data=second_data)
+    assert response.status_code == 302
+    with app.app_context():
+        assert SmsConsent.query.filter_by(phone="+13305550188").first() is None
+        assert Application.query.filter_by(business_name="No Consent Kitchen").count() == 1
