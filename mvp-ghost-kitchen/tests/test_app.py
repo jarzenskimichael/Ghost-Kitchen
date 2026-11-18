@@ -11,7 +11,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs
 from app import create_app, db
 from app.routes import send_sms
-from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord
+from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, SmsConsent
 
 
 @pytest.fixture()
@@ -336,3 +336,48 @@ def test_single_monday_application_approval_and_insurance_certificate(app, clien
         assert insurance.carrier == "Updated Mutual"
         assert insurance.policy_number == "POL-456"
         assert insurance.certificate_data == b"updated certificate"
+
+
+def test_sms_opt_in_requires_phone_and_explicit_consent(app, client):
+    page = client.get("/sms-opt-in").get_data(as_text=True)
+    assert 'name="phone"' in page
+    assert 'name="sms_consent"' in page
+    assert "Chef MJ" in page
+
+    missing_consent = client.post(
+        "/sms-opt-in",
+        data={"phone": "(330) 555-0123"},
+        follow_redirects=True,
+    )
+    assert missing_consent.status_code == 200
+    assert "Please check the SMS consent box" in missing_consent.get_data(as_text=True)
+    with app.app_context():
+        assert SmsConsent.query.count() == 0
+
+    invalid_phone = client.post(
+        "/sms-opt-in",
+        data={"phone": "123", "sms_consent": "yes"},
+        follow_redirects=True,
+    )
+    assert "Enter a valid 10-digit US phone number" in invalid_phone.get_data(as_text=True)
+
+    accepted = client.post(
+        "/sms-opt-in",
+        data={"phone": "(330) 555-0123", "sms_consent": "yes"},
+        follow_redirects=True,
+    )
+    assert accepted.status_code == 200
+    assert "Your SMS opt-in has been recorded" in accepted.get_data(as_text=True)
+    with app.app_context():
+        consent = SmsConsent.query.filter_by(phone="+13305550123").one()
+        assert consent.active is True
+        assert consent.consent_source == "Website SMS opt-in form"
+        assert consent.consent_text_version == "2026-11-17"
+        assert consent.consent_at is not None
+
+
+def test_registered_campaign_brand_is_visible_in_site_header_and_footer(client):
+    page = client.get("/").get_data(as_text=True)
+    assert "CHEF MJ&#39;S FEEL GOOD BBQ" in page
+    assert "Chef MJs Feel Good BBQ LLC" in page
+    assert "Merriman Valley Pizza" in page
