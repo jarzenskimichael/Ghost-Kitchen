@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from base64 import b64encode
 from email.message import EmailMessage
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import wraps
 from urllib.parse import urlsplit
 
@@ -16,7 +16,7 @@ from flask import (
     url_for, flash, session, abort, send_from_directory, send_file,
 )
 from app import db
-from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, Setting
+from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, Setting, SmsConsent
 
 bp = Blueprint("main", __name__)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
@@ -196,9 +196,42 @@ def inject_globals():
     }
 
 
-@bp.route("/sms-opt-in")
+@bp.route("/sms-opt-in", methods=["GET", "POST"])
 def sms_opt_in():
-    return render_template("sms_opt_in.html")
+    if request.method == "POST":
+        raw_phone = request.form.get("phone", "").strip()
+        digits = "".join(character for character in raw_phone if character.isdigit())
+        if len(digits) == 10:
+            phone = "+1" + digits
+        elif len(digits) == 11 and digits.startswith("1"):
+            phone = "+" + digits
+        else:
+            phone = ""
+
+        if not phone:
+            flash("Enter a valid 10-digit US phone number.", "error")
+            return render_template("sms_opt_in.html", phone=raw_phone)
+        if request.form.get("sms_consent") != "yes":
+            flash("Please check the SMS consent box to enroll. Consent is optional.", "error")
+            return render_template("sms_opt_in.html", phone=raw_phone)
+
+        consent = SmsConsent.query.filter_by(phone=phone).first()
+        if consent:
+            consent.consent_at = datetime.utcnow()
+            consent.consent_source = "Website SMS opt-in form"
+            consent.consent_text_version = "2026-11-17"
+            consent.active = True
+        else:
+            db.session.add(SmsConsent(
+                phone=phone,
+                consent_source="Website SMS opt-in form",
+                consent_text_version="2026-11-17",
+            ))
+        db.session.commit()
+        flash("Your SMS opt-in has been recorded. Message frequency varies; message and data rates may apply. Reply STOP to opt out.", "success")
+        return redirect(url_for("main.sms_opt_in"))
+
+    return render_template("sms_opt_in.html", phone="")
 
 
 @bp.route("/privacy")
