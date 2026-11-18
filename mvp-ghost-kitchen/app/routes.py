@@ -353,6 +353,18 @@ def apply():
             photo_name = secrets.token_hex(12) + "." + extension
             upload.save(os.path.join(current_app.config["UPLOAD_FOLDER"], photo_name))
 
+        sms_opted_in = request.form.get("sms_consent") == "yes"
+        sms_phone = None
+        if sms_opted_in:
+            phone_digits = "".join(character for character in request.form.get("phone", "") if character.isdigit())
+            if len(phone_digits) == 10:
+                sms_phone = "+1" + phone_digits
+            elif len(phone_digits) == 11 and phone_digits.startswith("1"):
+                sms_phone = "+" + phone_digits
+            if not sms_phone:
+                flash("Enter a valid US mobile number or leave the optional SMS consent box unchecked.", "error")
+                return render_template("apply.html", monday_slots=choices, form=request.form)
+
         application = Application(
             business_name=request.form["business_name"].strip(),
             owner_name=request.form["owner_name"].strip(),
@@ -372,6 +384,19 @@ def apply():
         )
         db.session.add(application)
         db.session.flush()
+        if sms_opted_in and sms_phone:
+            consent = SmsConsent.query.filter_by(phone=sms_phone).first()
+            if consent:
+                consent.consent_at = datetime.utcnow()
+                consent.consent_source = "Ghost Kitchen application form"
+                consent.consent_text_version = "2026-11-18-application"
+                consent.active = True
+            else:
+                db.session.add(SmsConsent(
+                    phone=sms_phone,
+                    consent_source="Ghost Kitchen application form",
+                    consent_text_version="2026-11-18-application",
+                ))
         for slot in selected_slots:
             db.session.add(MondayRequest(application_id=application.id, slot_id=slot.id))
         insurance_upload = request.files.get("insurance_certificate")
