@@ -21,7 +21,8 @@ class Config:
         "UPLOAD_FOLDER",
         os.path.join(os.path.dirname(__file__), "instance", "uploads"),
     )
-    BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Merriman Valley Pizza")
+    BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Chef MJ's Feel Good BBQ")
+    LEGAL_BUSINESS_NAME = "Chef MJs Feel Good BBQ LLC"
     RENTAL_RATE = int(os.environ.get("RENTAL_RATE", "150"))
     TIMEZONE = os.environ.get("TIMEZONE", "America/New_York")
 
