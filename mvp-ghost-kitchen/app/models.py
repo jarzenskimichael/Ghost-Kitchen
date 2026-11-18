@@ -88,3 +88,13 @@ class InsuranceRecord(db.Model):
     certificate_data = db.Column(db.LargeBinary)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     application = db.relationship("Application", backref=db.backref("insurance_record", uselist=False))
+
+
+class SmsConsent(db.Model):
+    """Auditable record of a consumer's explicit website SMS opt-in."""
+    id = db.Column(db.Integer, primary_key=True)
+    phone = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    consent_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    consent_source = db.Column(db.String(120), nullable=False)
+    consent_text_version = db.Column(db.String(40), nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
