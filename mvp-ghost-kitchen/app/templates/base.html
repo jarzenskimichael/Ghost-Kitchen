@@ -11,7 +11,7 @@
 </head>
 <body>
 <header class="site-header">
-  <a class="brand" href="{{ url_for('main.home') }}"><span class="brand-mark">MVP</span><span>GHOST KITCHEN<small>BY MERRIMAN VALLEY PIZZA</small></span></a>
+  <a class="brand" href="{{ url_for('main.home') }}"><span class="brand-mark">MVP</span><span>GHOST KITCHEN<small>BY CHEF MJ&#39;S FEEL GOOD BBQ</small></span></a>
   <button class="menu-toggle" aria-label="Toggle navigation" onclick="document.querySelector('.nav').classList.toggle('open')">☰</button>
   <nav class="nav">
     <a href="{{ url_for('main.how_it_works') }}">How It Works</a>
@@ -28,9 +28,9 @@
   {% block content %}{% endblock %}
 </main>
 <footer class="site-footer">
-  <div><strong>MVP GHOST KITCHEN</strong><p>A place to test, build, and grow your food business.</p></div>
+  <div><strong>CHEF MJ&#39;S FEEL GOOD BBQ</strong><p>MVP Ghost Kitchen · Merriman Valley Pizza</p><p>A place to test, build, and grow your food business.</p></div>
   <div class="footer-links"><a href="{{ url_for('main.how_it_works') }}">How it works</a><a href="{{ url_for('main.calendar') }}">Availability</a><a href="{{ url_for('main.apply') }}">Apply</a><a href="{{ url_for('main.privacy') }}">Privacy Policy</a><a href="{{ url_for('main.terms') }}">Terms &amp; Conditions</a><a href="{{ url_for('main.sms_opt_in') }}">SMS Program</a><a href="{{ url_for('main.admin_login') }}">Organizer login</a></div>
-  <small>© {{ business_name }} · Ghost Kitchen Program</small>
+  <small>© Chef MJs Feel Good BBQ LLC · Ghost Kitchen Program · Merriman Valley Pizza</small>
 </footer>
 <script>
 document.querySelectorAll('[data-confirm]').forEach(el => el.addEventListener('click', e => { if (!confirm(el.dataset.confirm)) e.preventDefault(); }));
