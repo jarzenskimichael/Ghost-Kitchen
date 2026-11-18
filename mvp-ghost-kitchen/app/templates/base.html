@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A commercial kitchen opportunity from Merriman Valley Pizza.">
+  <meta name="description" content="Chef MJ&#39;s Feel Good BBQ LLC Ghost Kitchen program at Merriman Valley Pizza.">
   <title>{% block title %}MVP Ghost Kitchen{% endblock %} | {{ business_name }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
 </head>
 <body>
 <header class="site-header">
-  <a class="brand" href="{{ url_for('main.home') }}"><span class="brand-mark">MVP</span><span>GHOST KITCHEN<small>BY CHEF MJ&#39;S FEEL GOOD BBQ</small></span></a>
+  <a class="brand" href="{{ url_for('main.home') }}"><span class="brand-mark">MVP</span><span>GHOST KITCHEN<small>CHEF MJ&#39;S FEEL GOOD BBQ LLC</small></span></a>
   <button class="menu-toggle" aria-label="Toggle navigation" onclick="document.querySelector('.nav').classList.toggle('open')">☰</button>
   <nav class="nav">
     <a href="{{ url_for('main.how_it_works') }}">How It Works</a>
@@ -28,7 +28,7 @@
   {% block content %}{% endblock %}
 </main>
 <footer class="site-footer">
-  <div><strong>CHEF MJ&#39;S FEEL GOOD BBQ</strong><p>MVP Ghost Kitchen · Merriman Valley Pizza</p><p>A place to test, build, and grow your food business.</p></div>
+  <div><strong>CHEF MJ&#39;S FEEL GOOD BBQ LLC</strong><p>Registered campaign business · MVP Ghost Kitchen at Merriman Valley Pizza</p><p>A place to test, build, and grow your food business.</p></div>
   <div class="footer-links"><a href="{{ url_for('main.how_it_works') }}">How it works</a><a href="{{ url_for('main.calendar') }}">Availability</a><a href="{{ url_for('main.apply') }}">Apply</a><a href="{{ url_for('main.privacy') }}">Privacy Policy</a><a href="{{ url_for('main.terms') }}">Terms &amp; Conditions</a><a href="{{ url_for('main.sms_opt_in') }}">SMS Program</a><a href="{{ url_for('main.admin_login') }}">Organizer login</a></div>
   <small>© Chef MJs Feel Good BBQ LLC · Ghost Kitchen Program · Merriman Valley Pizza</small>
 </footer>
