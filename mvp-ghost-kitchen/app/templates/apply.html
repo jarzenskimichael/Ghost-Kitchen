@@ -8,10 +8,6 @@
 <label>Owner / primary contact *<input name="owner_name" required value="{{ form.get('owner_name','') }}"></label>
 <label>Email address *<input type="email" name="email" required value="{{ form.get('email','') }}"></label>
 <label>Phone number *<input type="tel" name="phone" required autocomplete="tel" value="{{ form.get('phone','') }}"></label>
-<div class="full form-consent sms-consent">
-<label class="check-label"><input type="checkbox" name="sms_consent" value="yes"> I agree to receive recurring automated text messages from <strong>Chef MJs Feel Good BBQ LLC</strong> about my MVP Ghost Kitchen application and scheduling updates at the mobile number I provided above. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. Consent is optional and is not a condition of applying, purchasing, or renting kitchen space.</label>
-<small class="field-help">This is optional and separate from your application. <a href="{{ url_for('main.sms_opt_in') }}">View SMS program details</a> · <a href="{{ url_for('main.privacy') }}">Privacy Policy</a> · <a href="{{ url_for('main.terms') }}">Terms &amp; Conditions</a>.</small>
-</div>
 <label>Business type *<select name="business_type" required><option value="">Choose one</option>{% for t in ['Established restaurant / food business','Food truck','Caterer','Pop-up / market vendor','New food entrepreneur','Other'] %}<option {% if form.get('business_type')==t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
 <label>Website <input type="url" name="website" placeholder="https://"></label>
 <label class="full">Social media link(s)<input name="social_links" placeholder="Instagram, Facebook, TikTok, etc."></label>
