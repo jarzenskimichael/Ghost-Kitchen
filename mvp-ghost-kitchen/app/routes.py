@@ -3,7 +3,6 @@ import mimetypes
 from io import BytesIO
 import secrets
 import smtplib
-import urllib.request
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -525,6 +524,16 @@ def admin_application(application_id):
             release_assigned_rotation(person)
             release_monday_assignments(person)
             person.status = "waitlist"
+            send_notice(
+                person.email,
+                "MVP Ghost Kitchen application update",
+                (
+                    f"Hi {person.owner_name},\\n\\n"
+                    f"Your application for {person.business_name} has been placed on our waitlist. "
+                    "We will contact you if an opportunity becomes available.\\n\\n"
+                    "Merriman Valley Pizza"
+                ),
+            )
 
         elif action == "request_info":
             release_assigned_rotation(person)
@@ -603,6 +612,7 @@ def update_monday_availability(slot_id):
 @admin_required
 def clear_monday_slot(slot_id):
     slot = MondaySlot.query.get_or_404(slot_id)
+    notice = None
     if slot.application_id:
         person = Application.query.get(slot.application_id)
         slot.application_id = None
@@ -613,10 +623,29 @@ def clear_monday_slot(slot_id):
                 legacy.application_id = None
                 legacy.status = "available"
             person.assigned_rotation_id = None
-        if person and not MondaySlot.query.filter_by(application_id=person.id).filter(MondaySlot.id != slot.id).first():
-            person.status = "pending"
-            person.published = False
+        if person:
+            remaining = MondaySlot.query.filter_by(application_id=person.id).filter(MondaySlot.id != slot.id).first()
+            if not remaining:
+                person.status = "pending"
+                person.published = False
+                notice = (
+                    person.email,
+                    "MVP Ghost Kitchen scheduling update",
+                    f"Hi {person.owner_name},\\n\\nThe Monday booking for {slot.monday_date.strftime('%B %-d, %Y')} "
+                    "has been removed. Your application has returned to pending review. "
+                    "Please contact MVP if you have questions.\\n\\nMerriman Valley Pizza",
+                )
+            else:
+                notice = (
+                    person.email,
+                    "MVP Ghost Kitchen scheduling update",
+                    f"Hi {person.owner_name},\\n\\nThe Monday booking for {slot.monday_date.strftime('%B %-d, %Y')} "
+                    "has been removed. Any other approved dates remain unchanged. "
+                    "Please contact MVP if you have questions.\\n\\nMerriman Valley Pizza",
+                )
     db.session.commit()
+    if notice:
+        send_notice(*notice)
     flash("Monday assignment cleared.", "success")
     return redirect(url_for("main.admin_rotations"))
 
@@ -665,14 +694,26 @@ def update_rotation_availability(rotation_id):
 @admin_required
 def clear_rotation(rotation_id):
     rotation = Rotation.query.get_or_404(rotation_id)
+    notice = None
     if rotation.application:
-        rotation.application.assigned_rotation_id = None
-        rotation.application.status = "pending"
-        rotation.application.published = False
+        person = rotation.application
+        person.assigned_rotation_id = None
+        person.status = "pending"
+        person.published = False
+        notice = (
+            person.email,
+            "MVP Ghost Kitchen scheduling update",
+            f"Hi {person.owner_name},\\n\\nYour two-Monday rotation beginning "
+            f"{rotation.start_date.strftime('%B %-d, %Y')} has been cleared and your application "
+            "has returned to pending review. Please contact MVP if you have questions.\\n\\n"
+            "Merriman Valley Pizza",
+        )
 
     rotation.application_id = None
     rotation.status = "available"
     db.session.commit()
+    if notice:
+        send_notice(*notice)
     flash(
         "Rotation cleared. The applicant is back in pending applications.",
         "success",
