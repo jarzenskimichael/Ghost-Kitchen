@@ -3,9 +3,7 @@ import mimetypes
 from io import BytesIO
 import secrets
 import smtplib
-import urllib.parse
 import urllib.request
-from base64 import b64encode
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -16,7 +14,7 @@ from flask import (
     url_for, flash, session, abort, send_from_directory, send_file,
 )
 from app import db
-from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, Setting, SmsConsent
+from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, Setting
 
 bp = Blueprint("main", __name__)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
@@ -50,43 +48,8 @@ def send_notice(to_address, subject, body):
         return False
 
 
-def send_sms(to_number, body):
-    """Send an optional SMS through Twilio; never block an application submission."""
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    from_number = os.environ.get("TWILIO_FROM_NUMBER")
-    if not all((account_sid, auth_token, from_number, to_number)):
-        return False
-
-    endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-    payload = urllib.parse.urlencode(
-        {"To": to_number, "From": from_number, "Body": body}
-    ).encode("utf-8")
-    credentials = b64encode(f"{account_sid}:{auth_token}".encode("utf-8")).decode("ascii")
-    sms_request = urllib.request.Request(
-        endpoint,
-        data=payload,
-        headers={
-            "Authorization": f"Basic {credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(sms_request, timeout=12) as response:
-            return 200 <= response.status < 300
-    except Exception:
-        current_app.logger.exception("Unable to send Ghost Kitchen SMS notification")
-        return False
-
-
 def notify_organizer(subject, body):
     send_notice(os.environ.get("ORGANIZER_EMAIL"), subject, body)
-
-
-def notify_organizer_sms(body):
-    send_sms(os.environ.get("ORGANIZER_PHONE"), body)
 
 
 def release_assigned_rotation(person):
@@ -194,44 +157,6 @@ def inject_globals():
         "business_name": current_app.config["BUSINESS_NAME"],
         "rental_rate": rental_rate(),
     }
-
-
-@bp.route("/sms-opt-in", methods=["GET", "POST"])
-def sms_opt_in():
-    if request.method == "POST":
-        raw_phone = request.form.get("phone", "").strip()
-        digits = "".join(character for character in raw_phone if character.isdigit())
-        if len(digits) == 10:
-            phone = "+1" + digits
-        elif len(digits) == 11 and digits.startswith("1"):
-            phone = "+" + digits
-        else:
-            phone = ""
-
-        if not phone:
-            flash("Enter a valid 10-digit US phone number.", "error")
-            return render_template("sms_opt_in.html", phone=raw_phone)
-        if request.form.get("sms_consent") != "yes":
-            flash("Please check the SMS consent box to enroll. Consent is optional.", "error")
-            return render_template("sms_opt_in.html", phone=raw_phone)
-
-        consent = SmsConsent.query.filter_by(phone=phone).first()
-        if consent:
-            consent.consent_at = datetime.utcnow()
-            consent.consent_source = "Website SMS opt-in form"
-            consent.consent_text_version = "2026-11-17"
-            consent.active = True
-        else:
-            db.session.add(SmsConsent(
-                phone=phone,
-                consent_source="Website SMS opt-in form",
-                consent_text_version="2026-11-17",
-            ))
-        db.session.commit()
-        flash("Your SMS opt-in has been recorded. Message frequency varies; message and data rates may apply. Reply STOP to opt out.", "success")
-        return redirect(url_for("main.sms_opt_in"))
-
-    return render_template("sms_opt_in.html", phone="")
 
 
 @bp.route("/privacy")
@@ -353,17 +278,6 @@ def apply():
             photo_name = secrets.token_hex(12) + "." + extension
             upload.save(os.path.join(current_app.config["UPLOAD_FOLDER"], photo_name))
 
-        sms_opted_in = request.form.get("sms_consent") == "yes"
-        sms_phone = None
-        if sms_opted_in:
-            phone_digits = "".join(character for character in request.form.get("phone", "") if character.isdigit())
-            if len(phone_digits) == 10:
-                sms_phone = "+1" + phone_digits
-            elif len(phone_digits) == 11 and phone_digits.startswith("1"):
-                sms_phone = "+" + phone_digits
-            if not sms_phone:
-                flash("Enter a valid US mobile number or leave the optional SMS consent box unchecked.", "error")
-                return render_template("apply.html", monday_slots=choices, form=request.form)
 
         application = Application(
             business_name=request.form["business_name"].strip(),
@@ -384,19 +298,7 @@ def apply():
         )
         db.session.add(application)
         db.session.flush()
-        if sms_opted_in and sms_phone:
-            consent = SmsConsent.query.filter_by(phone=sms_phone).first()
-            if consent:
-                consent.consent_at = datetime.utcnow()
-                consent.consent_source = "Ghost Kitchen application form"
-                consent.consent_text_version = "2026-11-18-application"
-                consent.active = True
-            else:
-                db.session.add(SmsConsent(
-                    phone=sms_phone,
-                    consent_source="Ghost Kitchen application form",
-                    consent_text_version="2026-11-18-application",
-                ))
+
         for slot in selected_slots:
             db.session.add(MondayRequest(application_id=application.id, slot_id=slot.id))
         insurance_upload = request.files.get("insurance_certificate")
@@ -436,10 +338,6 @@ def apply():
                 f"({application.email}, {application.phone}). Review it in the "
                 f"organizer dashboard: {admin_url}"
             ),
-        )
-        notify_organizer_sms(
-            f"Ghost Kitchen: New application from {application.business_name} "
-            f"({application.owner_name}). Review: {admin_url}"
         )
         send_notice(
             application.email,
@@ -544,7 +442,6 @@ def admin_application(application_id):
                 body = f"Hi {person.owner_name}, your application for {person.business_name} is approved for {dates_text}. Total rental: ${total} (${rental_rate()} per Monday)."
                 send_notice(person.email, "MVP Ghost Kitchen application approved", body)
                 notify_organizer(f"Approved: {person.business_name}", f"Dates: {dates_text}")
-                notify_organizer_sms(f"Ghost Kitchen: {person.business_name} approved for {dates_text}.")
                 flash("Application approved and Monday date(s) assigned.", "success")
                 return redirect(url_for("main.admin_application", application_id=person.id))
 
@@ -603,10 +500,6 @@ def admin_application(application_id):
                         f"{person.business_name} was approved for "
                         f"{rotation.start_date} and {rotation.second_date}."
                     ),
-                )
-                notify_organizer_sms(
-                    f"Ghost Kitchen: {person.business_name} was approved for "
-                    f"{rotation.start_date} and {rotation.second_date}."
                 )
                 flash("Application approved and rotation assigned.", "success")
                 return redirect(
