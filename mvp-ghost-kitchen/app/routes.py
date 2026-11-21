@@ -528,9 +528,9 @@ def admin_application(application_id):
                 person.email,
                 "MVP Ghost Kitchen application update",
                 (
-                    f"Hi {person.owner_name},\\n\\n"
+                    f"Hi {person.owner_name},\n\n"
                     f"Your application for {person.business_name} has been placed on our waitlist. "
-                    "We will contact you if an opportunity becomes available.\\n\\n"
+                    "We will contact you if an opportunity becomes available.\n\n"
                     "Merriman Valley Pizza"
                 ),
             )
@@ -631,17 +631,17 @@ def clear_monday_slot(slot_id):
                 notice = (
                     person.email,
                     "MVP Ghost Kitchen scheduling update",
-                    f"Hi {person.owner_name},\\n\\nThe Monday booking for {slot.monday_date.strftime('%B %-d, %Y')} "
+                    f"Hi {person.owner_name},\n\nThe Monday booking for {slot.monday_date.strftime('%B %-d, %Y')} "
                     "has been removed. Your application has returned to pending review. "
-                    "Please contact MVP if you have questions.\\n\\nMerriman Valley Pizza",
+                    "Please contact MVP if you have questions.\n\nMerriman Valley Pizza",
                 )
             else:
                 notice = (
                     person.email,
                     "MVP Ghost Kitchen scheduling update",
-                    f"Hi {person.owner_name},\\n\\nThe Monday booking for {slot.monday_date.strftime('%B %-d, %Y')} "
+                    f"Hi {person.owner_name},\n\nThe Monday booking for {slot.monday_date.strftime('%B %-d, %Y')} "
                     "has been removed. Any other approved dates remain unchanged. "
-                    "Please contact MVP if you have questions.\\n\\nMerriman Valley Pizza",
+                    "Please contact MVP if you have questions.\n\nMerriman Valley Pizza",
                 )
     db.session.commit()
     if notice:
@@ -703,9 +703,9 @@ def clear_rotation(rotation_id):
         notice = (
             person.email,
             "MVP Ghost Kitchen scheduling update",
-            f"Hi {person.owner_name},\\n\\nYour two-Monday rotation beginning "
+            f"Hi {person.owner_name},\n\nYour two-Monday rotation beginning "
             f"{rotation.start_date.strftime('%B %-d, %Y')} has been cleared and your application "
-            "has returned to pending review. Please contact MVP if you have questions.\\n\\n"
+            "has returned to pending review. Please contact MVP if you have questions.\n\n"
             "Merriman Valley Pizza",
         )
 
