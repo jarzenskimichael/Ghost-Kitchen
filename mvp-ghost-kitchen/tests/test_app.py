@@ -7,7 +7,6 @@ os.environ.setdefault("ADMIN_PASSWORD", "test-organizer-password")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 import pytest
-from unittest.mock import patch
 from app import create_app, db
 from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord
 
