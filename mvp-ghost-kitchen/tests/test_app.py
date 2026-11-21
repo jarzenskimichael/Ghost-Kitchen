@@ -7,11 +7,8 @@ os.environ.setdefault("ADMIN_PASSWORD", "test-organizer-password")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 import pytest
-from unittest.mock import patch
-from urllib.parse import parse_qs
 from app import create_app, db
-from app.routes import send_sms
-from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord, SmsConsent
+from app.models import Application, Rotation, RotationClosure, MondaySlot, MondayRequest, InsuranceRecord
 
 
 @pytest.fixture()
@@ -222,42 +219,6 @@ def test_login_rejects_external_next_redirect(client):
 
 
 
-def test_sms_sends_through_twilio_when_configured(app, monkeypatch):
-    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "AC123")
-    monkeypatch.setenv("TWILIO_AUTH_TOKEN", "test-token")
-    monkeypatch.setenv("TWILIO_FROM_NUMBER", "+15550000001")
-
-    with app.app_context():
-        with patch("app.routes.urllib.request.urlopen") as urlopen:
-            urlopen.return_value.__enter__.return_value.status = 201
-            assert send_sms(
-                "+15550000002",
-                "New Ghost Kitchen application",
-            ) is True
-
-    request = urlopen.call_args.args[0]
-    assert request.full_url.endswith("/Accounts/AC123/Messages.json")
-    payload = parse_qs(request.data.decode("utf-8"))
-    assert payload["To"] == ["+15550000002"]
-    assert payload["From"] == ["+15550000001"]
-    assert payload["Body"] == ["New Ghost Kitchen application"]
-
-
-def test_sms_is_skipped_when_twilio_is_not_configured(app, monkeypatch):
-    for key in (
-        "TWILIO_ACCOUNT_SID",
-        "TWILIO_AUTH_TOKEN",
-        "TWILIO_FROM_NUMBER",
-        "ORGANIZER_PHONE",
-    ):
-        monkeypatch.delenv(key, raising=False)
-
-    with app.app_context():
-        with patch("app.routes.urllib.request.urlopen") as urlopen:
-            assert send_sms("+15550000002", "Test") is False
-            urlopen.assert_not_called()
-
-
 def test_single_monday_application_approval_and_insurance_certificate(app, client):
     with app.app_context():
         first_date = date.today() + timedelta(days=(7 - date.today().weekday()) % 7 or 7)
@@ -338,44 +299,6 @@ def test_single_monday_application_approval_and_insurance_certificate(app, clien
         assert insurance.certificate_data == b"updated certificate"
 
 
-def test_sms_opt_in_requires_phone_and_explicit_consent(app, client):
-    page = client.get("/sms-opt-in").get_data(as_text=True)
-    assert 'name="phone"' in page
-    assert 'name="sms_consent"' in page
-    assert "Chef MJ" in page
-
-    missing_consent = client.post(
-        "/sms-opt-in",
-        data={"phone": "(330) 555-0123"},
-        follow_redirects=True,
-    )
-    assert missing_consent.status_code == 200
-    assert "Please check the SMS consent box" in missing_consent.get_data(as_text=True)
-    with app.app_context():
-        assert SmsConsent.query.count() == 0
-
-    invalid_phone = client.post(
-        "/sms-opt-in",
-        data={"phone": "123", "sms_consent": "yes"},
-        follow_redirects=True,
-    )
-    assert "Enter a valid 10-digit US phone number" in invalid_phone.get_data(as_text=True)
-
-    accepted = client.post(
-        "/sms-opt-in",
-        data={"phone": "(330) 555-0123", "sms_consent": "yes"},
-        follow_redirects=True,
-    )
-    assert accepted.status_code == 200
-    assert "Your SMS opt-in has been recorded" in accepted.get_data(as_text=True)
-    with app.app_context():
-        consent = SmsConsent.query.filter_by(phone="+13305550123").one()
-        assert consent.active is True
-        assert consent.consent_source == "Website SMS opt-in form"
-        assert consent.consent_text_version == "2026-11-17"
-        assert consent.consent_at is not None
-
-
 def test_registered_campaign_brand_is_visible_in_site_header_and_footer(client):
     page = client.get("/").get_data(as_text=True)
     assert "CHEF MJ&#39;S FEEL GOOD BBQ" in page
@@ -383,37 +306,32 @@ def test_registered_campaign_brand_is_visible_in_site_header_and_footer(client):
     assert "Merriman Valley Pizza" in page
 
 
-def test_application_sms_consent_is_optional_and_bound_to_submitted_phone(app, client):
+def test_email_only_application_flow_has_no_sms_opt_in(app, client, monkeypatch):
+    sent = []
+    monkeypatch.setenv("ORGANIZER_EMAIL", "organizer@example.com")
+    monkeypatch.setattr("app.routes.send_notice", lambda to, subject, body: sent.append((to, subject, body)) or True)
+
     page = client.get("/apply").get_data(as_text=True)
     assert 'name="phone"' in page
-    assert 'name="sms_consent"' in page
-    assert "Chef MJs Feel Good BBQ LLC" in page
-    assert "Consent is optional" in page
+    assert 'name="sms_consent"' not in page
+    assert client.get("/sms-opt-in").status_code == 404
 
-    base_data = {
-        "business_name": "Consent Test Kitchen",
-        "owner_name": "Test Owner",
-        "email": "consent@example.com",
-        "phone": "(330) 555-0199",
-        "business_type": "Food truck",
-        "description": "A test business",
-        "concept": "Sandwiches",
-        "menu": "Sandwiches",
-        "equipment": "Standard equipment",
-        "license_info": "In progress",
-        "insurance_info": "Insured",
-    }
-    accepted = client.post("/apply", data={**base_data, "sms_consent": "yes"})
-    assert accepted.status_code == 302
-    with app.app_context():
-        consent = SmsConsent.query.filter_by(phone="+13305550199").one()
-        assert consent.active is True
-        assert consent.consent_source == "Ghost Kitchen application form"
-        assert consent.consent_text_version == "2026-11-18-application"
-
-    second_data = {**base_data, "business_name": "No Consent Kitchen", "email": "no-consent@example.com", "phone": "3305550188"}
-    response = client.post("/apply", data=second_data)
+    response = client.post(
+        "/apply",
+        data={
+            "business_name": "Email Only Kitchen",
+            "owner_name": "Test Owner",
+            "email": "applicant@example.com",
+            "phone": "3305550199",
+            "business_type": "Food truck",
+            "description": "A test business",
+            "concept": "Sandwiches",
+            "menu": "Sandwiches",
+            "equipment": "Standard equipment",
+            "license_info": "In progress",
+            "insurance_info": "Insured",
+        },
+    )
     assert response.status_code == 302
-    with app.app_context():
-        assert SmsConsent.query.filter_by(phone="+13305550188").first() is None
-        assert Application.query.filter_by(business_name="No Consent Kitchen").count() == 1
+    assert len(sent) == 2
+    assert {item[0] for item in sent} == {"organizer@example.com", "applicant@example.com"}
