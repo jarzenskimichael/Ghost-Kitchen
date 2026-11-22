@@ -1,12 +1,14 @@
 import os
 import mimetypes
-from io import BytesIO
+from io import BytesIO, StringIO
 import secrets
+import csv
 import smtplib
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta
 from functools import wraps
 from urllib.parse import urlsplit
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from flask import (
     Blueprint, current_app, render_template, request, redirect,
@@ -49,6 +51,18 @@ def send_notice(to_address, subject, body):
 
 def notify_organizer(subject, body):
     send_notice(os.environ.get("ORGANIZER_EMAIL"), subject, body)
+
+
+def status_serializer():
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="vendor-application-status")
+
+
+def insurance_checklist(record):
+    return {"carrier": bool(record and record.carrier),
+            "policy_number": bool(record and record.policy_number),
+            "coverage": bool(record and record.coverage_amount),
+            "expiration": bool(record and record.expires_on),
+            "certificate": bool(record and record.certificate_data)}
 
 
 def release_assigned_rotation(person):
@@ -380,13 +394,22 @@ def apply():
                 "and contact you.\n\nMerriman Valley Pizza"
             ),
         )
-        flash(
-            "Your application has been submitted. MVP will review it and contact you.",
-            "success",
-        )
-        return redirect(url_for("main.apply"))
+        status_token = status_serializer().dumps({"id": application.id, "email": application.email})
+        return redirect(url_for("main.vendor_status", token=status_token))
 
     return render_template("apply.html", monday_slots=choices, form={})
+
+
+@bp.route("/application-status/<token>")
+def vendor_status(token):
+    try:
+        payload = status_serializer().loads(token, max_age=60 * 60 * 24 * 365)
+    except (BadSignature, SignatureExpired):
+        abort(404)
+    person = Application.query.filter_by(id=payload.get("id"), email=payload.get("email")).first_or_404()
+    requests = MondayRequest.query.filter_by(application_id=person.id).all()
+    assigned = MondaySlot.query.filter_by(application_id=person.id).order_by(MondaySlot.monday_date).all()
+    return render_template("vendor_status.html", person=person, requests=requests, assigned=assigned)
 
 
 @bp.route("/admin/login", methods=["GET", "POST"])
@@ -427,15 +450,46 @@ def admin_logout():
 @bp.route("/admin")
 @admin_required
 def admin_dashboard():
-    applications = Application.query.order_by(Application.created_at.desc()).all()
+    query = Application.query
+    status_filter = request.args.get("status", "").strip()
+    search = request.args.get("q", "").strip()
+    if status_filter in {"pending", "approved", "rejected", "waitlist", "info_requested"}:
+        query = query.filter(Application.status == status_filter)
+    if search:
+        term = f"%{search}%"
+        query = query.filter(db.or_(Application.business_name.ilike(term), Application.owner_name.ilike(term), Application.email.ilike(term)))
+    applications = query.order_by(Application.created_at.desc()).all()
     pending = [application for application in applications if application.status == "pending"]
     upcoming = get_monday_slots()[:10]
-    return render_template(
-        "admin_dashboard.html",
-        applications=applications,
-        pending=pending,
-        monday_slots=upcoming,
-    )
+    return render_template("admin_dashboard.html", applications=applications, pending=pending,
+                           monday_slots=upcoming, status_filter=status_filter, search=search)
+
+
+@bp.route("/admin/schedule.csv")
+@admin_required
+def export_schedule():
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Monday", "Business", "Owner", "Email", "Phone", "Menu", "Payment", "Insurance"])
+    slots = MondaySlot.query.filter(MondaySlot.application_id.isnot(None)).order_by(MondaySlot.monday_date).all()
+    for slot in slots:
+        person = slot.application
+        record = person.insurance_record
+        complete = bool(record and record.carrier and record.policy_number and record.coverage_amount and record.expires_on and record.certificate_data)
+        writer.writerow([slot.monday_date.isoformat(), person.business_name, person.owner_name, person.email, person.phone, person.menu, person.payment_status, "Complete" if complete else "Incomplete"])
+    return current_app.response_class(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=ghost-kitchen-schedule.csv"})
+
+
+@bp.route("/admin/weekly-print")
+@admin_required
+def weekly_print():
+    try:
+        start = date.fromisoformat(request.args.get("week", ""))
+    except ValueError:
+        start = date.today() + timedelta(days=(7 - date.today().weekday()) % 7)
+    end = start + timedelta(days=6)
+    slots = MondaySlot.query.filter(MondaySlot.monday_date >= start, MondaySlot.monday_date <= end, MondaySlot.application_id.isnot(None)).order_by(MondaySlot.monday_date).all()
+    return render_template("weekly_print.html", slots=slots, start=start, end=end)
 
 
 @bp.route("/admin/applications/<int:application_id>", methods=["GET", "POST"])
