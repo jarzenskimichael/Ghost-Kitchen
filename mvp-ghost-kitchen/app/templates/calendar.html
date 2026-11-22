@@ -2,7 +2,7 @@
 {% block title %}Availability{% endblock %}
 {% block content %}
 <section class="page-hero compact"><p class="eyebrow">THE MONDAY CALENDAR</p><h1>Find your<br><em>Mondays.</em></h1><p>Each Monday is booked independently. Request one date or several; all dates are subject to review and approval by MVP.</p></section>
-<section class="section">
+<section class="section"><div class="admin-section-head"><h2>Monthly availability</h2><span>Browse the upcoming kitchen schedule</span></div>
   <div class="calendar-legend"><span><i class="dot available"></i> Available</span><span><i class="dot booked"></i> Assigned</span><span><i class="dot unavailable"></i> Unavailable</span></div>
   <div class="calendar-list">{% for slot in monday_slots %}
     <div class="calendar-row"><div class="calendar-date"><span>{{ slot.monday_date.strftime('%b') }}</span><strong>{{ slot.monday_date.strftime('%d') }}</strong></div>
