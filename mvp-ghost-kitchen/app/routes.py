@@ -236,6 +236,30 @@ def apply():
         if len(selected_ids) != len(set(selected_ids)):
             flash("A Monday can only be selected once.", "error")
             return render_template("apply.html", monday_slots=choices, form=request.form)
+
+        # Each application may request up to three separate sessions.
+        # A session is one Monday or two consecutive Mondays.
+        requested_dates = sorted(
+            MondaySlot.query.filter(MondaySlot.id.in_(selected_ids)).with_entities(
+                MondaySlot.monday_date
+            ).all()
+        ) if selected_ids else []
+        requested_dates = [row[0] for row in requested_dates]
+        sessions = []
+        for requested_date in requested_dates:
+            if not sessions or (requested_date - sessions[-1][-1]).days != 7:
+                sessions.append([requested_date])
+            else:
+                sessions[-1].append(requested_date)
+
+        if len(sessions) > 3 or any(len(group) > 2 for group in sessions):
+            flash(
+                "Please request up to three sessions. Each session can be one Monday "
+                "or two consecutive Mondays. Separate sessions may be in different months.",
+                "error",
+            )
+            return render_template("apply.html", monday_slots=choices, form=request.form)
+
         selected_slots = []
         legacy_preference = request.form.get("preferred_rotation", "").strip()
         if legacy_preference and not selected_ids:
