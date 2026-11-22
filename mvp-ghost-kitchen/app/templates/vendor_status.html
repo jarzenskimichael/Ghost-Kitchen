@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block title %}Application status{% endblock %}{% block content %}
+<section class="page-hero compact"><p class="eyebrow">PRIVATE APPLICATION LINK</p><h1>Your application<br><em>status.</em></h1><p>This private link lets you check your application without creating an account. Save it for later.</p></section>
+<section class="section" style="max-width:850px;margin:auto"><div class="admin-panel">
+<h2>{{ person.business_name }}</h2><p>Application status: <span class="status-pill {{ person.status }}">{{ person.status|replace('_',' ')|title }}</span></p>
+<h3>Requested Mondays</h3>{% for item in requests %}<p>{{ item.slot.monday_date.strftime('%A, %B %-d, %Y') }} — {% if item.slot.application_id==person.id %}<strong>Approved</strong>{% else %}Pending organizer review{% endif %}</p>{% else %}<p>No Monday requests are listed.</p>{% endfor %}
+{% if assigned %}<h3>Confirmed dates</h3>{% for slot in assigned %}<p>{{ slot.monday_date.strftime('%A, %B %-d, %Y') }}</p>{% endfor %}{% endif %}
+<p class="muted small">Requested dates are not confirmed until they appear as approved. Contact MVP directly if you need to update your application.</p></div></section>{% endblock %}
