@@ -461,8 +461,13 @@ def admin_dashboard():
     applications = query.order_by(Application.created_at.desc()).all()
     pending = [application for application in applications if application.status == "pending"]
     upcoming = get_monday_slots()[:10]
+    status_links = {
+        application.id: url_for("main.vendor_status", token=status_serializer().dumps({"id": application.id, "email": application.email}))
+        for application in applications
+    }
     return render_template("admin_dashboard.html", applications=applications, pending=pending,
-                           monday_slots=upcoming, status_filter=status_filter, search=search)
+                           monday_slots=upcoming, status_filter=status_filter, search=search,
+                           status_links=status_links)
 
 
 @bp.route("/admin/schedule.csv")
