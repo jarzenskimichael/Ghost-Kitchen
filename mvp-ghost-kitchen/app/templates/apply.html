@@ -16,12 +16,9 @@
 <label class="full">Proposed menu *<textarea name="menu" rows="5" required placeholder="List the items you plan to serve and brief descriptions.">{{ form.get('menu','') }}</textarea></label>
 <label class="full">Equipment and kitchen needs *<textarea name="equipment" rows="3" required placeholder="What equipment do you need? What will you bring?">{{ form.get('equipment','') }}</textarea></label>
 <label class="full">Food-service licensing *<textarea name="license_info" rows="2" required placeholder="Describe your current license / permit status. Do not upload sensitive license numbers here."></textarea></label>
-<label class="full">Insurance status / additional details *<textarea name="insurance_info" rows="2" required placeholder="Describe your current business liability insurance status."></textarea></label>
-<label>Insurance carrier<input name="insurance_carrier" value="{{ form.get('insurance_carrier','') }}" placeholder="Insurance company"></label>
-<label>Policy number<input name="insurance_policy_number" value="{{ form.get('insurance_policy_number','') }}" placeholder="Policy number"></label>
-<label>Coverage amount<input name="insurance_coverage" value="{{ form.get('insurance_coverage','') }}" placeholder="e.g. $1,000,000 per occurrence"></label>
-<label>Policy expiration date<input type="date" name="insurance_expires_on" value="{{ form.get('insurance_expires_on','') }}"></label>
-<label class="full">Certificate of insurance (COI)<input type="file" name="insurance_certificate" accept=".pdf,.jpg,.jpeg,.png,.webp"><small class="field-help">Upload your current certificate if available. PDF, JPG, PNG, or WEBP.</small></label>
+<label>Insurance company *<input name="insurance_carrier" required value="{{ form.get('insurance_carrier','') }}" placeholder="Who provides your business insurance?"></label>
+<label>Policy start date *<input type="date" name="insurance_start_date" required value="{{ form.get('insurance_start_date','') }}"></label>
+<p class="field-help full">If your business is approved, we'll collect your policy number, coverage limits, expiration date, and certificate of insurance before your first session.</p>
 <label class="full">Food photos or sample menu (optional)<input type="file" name="food_photo" accept=".jpg,.jpeg,.png,.webp,.pdf"><small class="field-help">JPG, PNG, WEBP, or PDF · 12 MB maximum</small></label>
 <div class="full"><strong>Preferred Monday sessions</strong><p class="field-help">Request up to 3 separate sessions during the season. Each session can be one Monday or two back-to-back Mondays. Sessions can be in different months. You may request dates, but they are not reserved unless MVP approves them.</p><p class="field-help" id="session-selection-status" aria-live="polite">Choose up to three sessions (up to six Mondays total).</p><div class="date-choice-list">{% for slot in monday_slots %}<label class="check-label"><input type="checkbox" name="preferred_mondays" value="{{ slot.id }}" data-date="{{ slot.monday_date.isoformat() }}"> {{ slot.monday_date.strftime('%A, %B %-d, %Y') }}</label>{% else %}<p class="muted">No dates are currently available to request.</p>{% endfor %}</div></div>
 </div>
@@ -32,34 +29,51 @@ document.addEventListener("DOMContentLoaded", function () {
   const boxes = Array.from(document.querySelectorAll('input[name="preferred_mondays"]'));
   const status = document.getElementById("session-selection-status");
   if (!boxes.length || !status) return;
-  function validateSessions() {
-    const dates = boxes.filter(box => box.checked).map(box => box.dataset.date).sort();
-    const groups = [];
-    dates.forEach(value => {
-      const day = new Date(value + "T12:00:00");
-      const previous = groups.length ? new Date(groups[groups.length - 1][groups[groups.length - 1].length - 1] + "T12:00:00") : null;
-      if (!previous || Math.round((day - previous) / 86400000) !== 7) groups.push([value]);
-      else groups[groups.length - 1].push(value);
+
+  function getSessions(selectedDates) {
+    const sorted = [...selectedDates].sort();
+    const sessions = [];
+    sorted.forEach(value => {
+      const current = new Date(value + "T12:00:00");
+      const previousGroup = sessions[sessions.length - 1];
+      const previous = previousGroup ? new Date(previousGroup[previousGroup.length - 1] + "T12:00:00") : null;
+      if (!previous || Math.round((current - previous) / 86400000) !== 7) sessions.push([value]);
+      else previousGroup.push(value);
     });
-    const invalid = groups.length > 3 || groups.some(group => group.length > 2);
-    status.textContent = invalid
-      ? "Please adjust your choices: up to 3 sessions, with no more than 2 consecutive Mondays per session."
-      : dates.length + " Monday(s) selected across " + groups.length + " session(s).";
-    status.style.color = invalid ? "#a33" : "";
-    boxes.forEach(box => { box.setCustomValidity(""); });
-    if (invalid && boxes.some(box => box.checked)) {
-      boxes.find(box => box.checked).setCustomValidity("Choose up to three sessions, each one or two consecutive Mondays.");
-    }
-    return !invalid;
+    return sessions;
   }
-  boxes.forEach(box => box.addEventListener("change", validateSessions));
+
+  function isValid(dates) {
+    const sessions = getSessions(dates);
+    return sessions.length <= 3 && sessions.every(session => session.length <= 2);
+  }
+
+  function refresh() {
+    const selected = boxes.filter(box => box.checked).map(box => box.dataset.date);
+    const sessions = getSessions(selected);
+    boxes.forEach(box => {
+      if (box.checked) {
+        box.disabled = false;
+        return;
+      }
+      box.disabled = !isValid([...selected, box.dataset.date]);
+    });
+    status.textContent = selected.length
+      ? selected.length + " Monday(s) selected across " + sessions.length + " session(s)."
+      : "Choose up to three sessions. Each session is one Monday or two consecutive Mondays.";
+  }
+
+  boxes.forEach(box => box.addEventListener("change", refresh));
   const form = document.querySelector(".application-form");
   if (form) form.addEventListener("submit", function (event) {
-    if (!validateSessions()) {
+    const selected = boxes.filter(box => box.checked).map(box => box.dataset.date);
+    if (!isValid(selected)) {
       event.preventDefault();
-      boxes.find(box => box.checked).reportValidity();
+      status.textContent = "Your selections must be up to three sessions, each one or two consecutive Mondays.";
+      status.style.color = "#a33";
     }
   });
+  refresh();
 });
 </script>
 </form></section>{% endblock %}

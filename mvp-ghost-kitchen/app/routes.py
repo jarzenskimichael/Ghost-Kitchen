@@ -216,7 +216,7 @@ def apply():
         required = [
             "business_name", "owner_name", "email", "phone", "business_type",
             "description", "concept", "menu", "equipment", "license_info",
-            "insurance_info",
+            "insurance_carrier", "insurance_start_date",
         ]
         missing = [
             field for field in required
@@ -224,6 +224,13 @@ def apply():
         ]
         if missing:
             flash("Please complete all required fields.", "error")
+            return render_template("apply.html", monday_slots=choices, form=request.form)
+
+        insurance_start_value = request.form.get("insurance_start_date", "").strip()
+        try:
+            insurance_start_date = date.fromisoformat(insurance_start_value)
+        except ValueError:
+            flash("Please provide a valid insurance policy start date.", "error")
             return render_template("apply.html", monday_slots=choices, form=request.form)
 
         raw_monday_ids = request.form.getlist("preferred_mondays")
@@ -315,7 +322,7 @@ def apply():
             website=request.form.get("website", "").strip(),
             equipment=request.form["equipment"].strip(),
             license_info=request.form["license_info"].strip(),
-            insurance_info=request.form["insurance_info"].strip(),
+            insurance_info=f"Policy start date: {insurance_start_date.strftime('%B %-d, %Y')}",
             preferred_rotation=None,
             photo_filename=photo_name,
         )
