@@ -36,8 +36,11 @@ def send_notice(to_address, subject, body):
 
     try:
         port = int(os.environ.get("SMTP_PORT", "587"))
-        with smtplib.SMTP(host, port, timeout=12) as smtp:
-            smtp.starttls()
+        use_ssl = os.environ.get("SMTP_USE_SSL", "false").lower() == "true"
+        smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+        with smtp_class(host, port, timeout=20) as smtp:
+            if not use_ssl:
+                smtp.starttls()
             username = os.environ.get("SMTP_USER")
             password = os.environ.get("SMTP_PASSWORD")
             if username and password:
