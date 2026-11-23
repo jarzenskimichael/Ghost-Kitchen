@@ -299,11 +299,12 @@ def test_single_monday_application_approval_and_insurance_certificate(app, clien
         assert insurance.certificate_data == b"updated certificate"
 
 
-def test_registered_campaign_brand_is_visible_in_site_header_and_footer(client):
-    page = client.get("/").get_data(as_text=True)
-    assert "CHEF MJ&#39;S FEEL GOOD BBQ" in page
-    assert "Chef MJs Feel Good BBQ LLC" in page
-    assert "Merriman Valley Pizza" in page
+def test_public_branding_uses_merriman_valley_pizza(client):
+    for path in ("/", "/apply", "/terms", "/privacy"):
+        page = client.get(path).get_data(as_text=True)
+        assert "Merriman Valley Pizza" in page
+        assert "Chef MJs Feel Good BBQ LLC" not in page
+        assert "CHEF MJ&#39;S FEEL GOOD BBQ" not in page
 
 
 def test_email_only_application_flow_has_no_sms_opt_in(app, client, monkeypatch):
