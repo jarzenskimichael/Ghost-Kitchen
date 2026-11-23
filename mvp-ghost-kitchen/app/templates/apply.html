@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Apply{% endblock %}{% block content %}
 <section class="page-hero compact"><p class="eyebrow">YOUR MONDAY STARTS HERE</p><h1>Apply to the<br><em>Ghost Kitchen.</em></h1><p>Tell us what you're building. Applications are reviewed by Chef MJ's Feel Good BBQ LLC, the registered business operating the MVP Ghost Kitchen at Merriman Valley Pizza. Submitting this form does not reserve a date.</p></section>
-<section class="section form-section"><div class="form-intro"><h2>Business application</h2><p class="muted">Fields marked * are required. The introductory rental rate is <strong>${{ rental_rate }} per approved Monday</strong>.</p></div>
+<section class="section form-section"><div class="form-intro"><h2>Business application</h2><p class="muted">Fields marked * are required. Pricing is <strong>${{ rental_rate }} for one Monday</strong> or <strong>${{ rotation_rate }} for two consecutive Mondays</strong>.</p></div>
 <form method="post" enctype="multipart/form-data" class="application-form">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <div class="form-grid">
@@ -22,7 +22,7 @@
 <label class="full">Food photos or sample menu (optional)<input type="file" name="food_photo" accept=".jpg,.jpeg,.png,.webp,.pdf"><small class="field-help">JPG, PNG, WEBP, or PDF · 12 MB maximum</small></label>
 <div class="full"><strong>Preferred Monday sessions</strong><p class="field-help" style="font-size: 1.1rem; line-height: 1.6;">Request up to 3 separate sessions during the season. Each session can be one Monday or two back-to-back Mondays. Sessions can be in different months. You may request dates, but they are not reserved unless MVP approves them.</p><p class="field-help" style="font-size: 1.05rem; line-height: 1.5;" id="session-selection-status" aria-live="polite">Choose up to three sessions (up to six Mondays total).</p><div class="date-choice-list">{% for slot in monday_slots %}<label class="check-label"><input type="checkbox" name="preferred_mondays" value="{{ slot.id }}" data-date="{{ slot.monday_date.isoformat() }}"> {{ slot.monday_date.strftime('%A, %B %-d, %Y') }}</label>{% else %}<p class="muted">No dates are currently available to request.</p>{% endfor %}</div></div>
 </div>
-<div class="form-consent"><label class="check-label"><input type="checkbox" required> I understand this is an application, not a reservation, and that MVP must approve my business, menu, and dates.</label><label class="check-label"><input type="checkbox" required> I understand the introductory rental rate is ${{ rental_rate }} per approved Monday, subject to final written terms.</label></div>
+<div class="form-consent"><label class="check-label"><input type="checkbox" required> I understand this is an application, not a reservation, and that MVP must approve my business, menu, and dates.</label><label class="check-label"><input type="checkbox" required> I understand the rental pricing is ${{ rental_rate }} for one Monday or ${{ rotation_rate }} for two consecutive Mondays, subject to final written terms.</label></div>
 <button class="button button-dark" type="submit">Submit application <span>→</span></button>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
