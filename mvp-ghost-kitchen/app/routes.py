@@ -95,7 +95,7 @@ def rental_rate():
 
 def rotation_rate():
     item = Setting.query.filter_by(key="rotation_rate").first()
-    return int(item.value) if item else rental_rate() * 2
+    return int(item.value) if item else 280
 
 
 def rental_total_for_dates(dates):
