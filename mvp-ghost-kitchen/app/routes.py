@@ -93,6 +93,22 @@ def rental_rate():
     return int(item.value) if item else current_app.config["RENTAL_RATE"]
 
 
+def rotation_rate():
+    item = Setting.query.filter_by(key="rotation_rate").first()
+    return int(item.value) if item else rental_rate() * 2
+
+
+def rental_total_for_dates(dates):
+    """Price each session as one Monday or a pair of consecutive Mondays."""
+    sessions = []
+    for monday in sorted(set(dates)):
+        if not sessions or (monday - sessions[-1][-1]).days != 7:
+            sessions.append([monday])
+        else:
+            sessions[-1].append(monday)
+    return sum(rotation_rate() if len(session) == 2 else rental_rate() for session in sessions)
+
+
 def ensure_rotations(months=15):
     today = date.today()
     # Anchor every-other-Monday blocks to the first Monday on or after today.
@@ -169,6 +185,7 @@ def inject_globals():
     return {
         "business_name": current_app.config["BUSINESS_NAME"],
         "rental_rate": rental_rate(),
+        "rotation_rate": rotation_rate(),
     }
 
 
@@ -527,8 +544,11 @@ def admin_application(application_id):
                 person.published = request.form.get("published") == "yes"
                 db.session.commit()
                 dates_text = ", ".join(slot.monday_date.strftime("%B %-d, %Y") for slot in selected)
-                total = rental_rate() * len(selected)
-                body = f"Hi {person.owner_name}, your application for {person.business_name} is approved for {dates_text}. Total rental: ${total} (${rental_rate()} per Monday)."
+                total = rental_total_for_dates([slot.monday_date for slot in selected])
+                body = (f"Hi {person.owner_name}, your application for {person.business_name} "
+                        f"is approved for {dates_text}. Total rental: ${total}. "
+                        f"Pricing is ${rental_rate()} for one Monday or ${rotation_rate()} "
+                        "for two consecutive Mondays.")
                 send_notice(person.email, "MVP Ghost Kitchen application approved", body)
                 notify_organizer(f"Approved: {person.business_name}", f"Dates: {dates_text}")
                 flash("Application approved and Monday date(s) assigned.", "success")
@@ -578,7 +598,7 @@ def admin_application(application_id):
                         f"for the two-Monday rotation beginning "
                         f"{rotation.start_date.strftime('%B %-d, %Y')} and continuing "
                         f"{rotation.second_date.strftime('%B %-d, %Y')}. The rental fee "
-                        f"is ${rental_rate() * 2} total. MVP will follow up with the "
+                        f"is ${rotation_rate()} total. MVP will follow up with the "
                         "remaining operating details and payment instructions.\n\n"
                         "Merriman Valley Pizza"
                     ),
@@ -655,7 +675,12 @@ def admin_application(application_id):
 
     return render_template(
         "admin_application.html", person=person, monday_slots=monday_slots,
-        requested_monday_ids={item.slot_id for item in MondayRequest.query.filter_by(application_id=person.id).all()}
+        requested_monday_ids={item.slot_id for item in MondayRequest.query.filter_by(application_id=person.id).all()},
+        expected_total=(rental_total_for_dates([slot.monday_date for slot in person.monday_slots])
+                        if person.monday_slots else
+                        rental_total_for_dates([item.slot.monday_date for item in person.monday_requests if item.slot])
+                        if person.monday_requests else
+                        (rotation_rate() if person.assigned_rotation_id else 0))
     )
 
 
@@ -817,22 +842,21 @@ def admin_settings():
     if request.method == "POST":
         try:
             amount = int(request.form.get("rental_rate", "150"))
-            if amount < 0 or amount > 10000:
+            package_amount = int(request.form.get("rotation_rate", "280"))
+            if any(value < 0 or value > 10000 for value in (amount, package_amount)):
                 raise ValueError()
-
-            setting = Setting.query.filter_by(key="rental_rate").first()
-            if not setting:
-                setting = Setting(key="rental_rate", value=str(amount))
-                db.session.add(setting)
-            else:
-                setting.value = str(amount)
-
+            for key, value in (("rental_rate", amount), ("rotation_rate", package_amount)):
+                setting = Setting.query.filter_by(key=key).first()
+                if not setting:
+                    db.session.add(Setting(key=key, value=str(value)))
+                else:
+                    setting.value = str(value)
             db.session.commit()
-            flash("Rental rate updated.", "success")
+            flash("Rental pricing updated.", "success")
         except ValueError:
             flash("Enter a valid rental amount.", "error")
 
-    return render_template("admin_settings.html", rate=rental_rate())
+    return render_template("admin_settings.html", rate=rental_rate(), rotation_rate=rotation_rate())
 
 
 @bp.route("/admin/applications/<int:application_id>/payment", methods=["POST"])
