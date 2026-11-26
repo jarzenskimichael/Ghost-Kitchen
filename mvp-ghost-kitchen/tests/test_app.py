@@ -336,3 +336,65 @@ def test_email_only_application_flow_has_no_sms_opt_in(app, client, monkeypatch)
     assert response.status_code == 302
     assert len(sent) == 2
     assert {item[0] for item in sent} == {"organizer@example.com", "applicant@example.com"}
+
+
+
+def test_send_notice_uses_gmail_api_and_refreshes_oauth_token(app, monkeypatch):
+    import json
+    import base64
+    from email import message_from_bytes
+    from urllib.parse import parse_qs
+    from app.routes import send_notice
+
+    monkeypatch.setenv("MAIL_FROM", "merrimanvalleypizza@gmail.com")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "client-id")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "client-secret")
+    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN", "refresh-token")
+    calls = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = json.dumps(payload).encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return self.payload
+
+    def fake_urlopen(request, timeout):
+        calls.append(request)
+        if request.full_url == "https://oauth2.googleapis.com/token":
+            form = parse_qs(request.data.decode("utf-8"))
+            assert form["grant_type"] == ["refresh_token"]
+            assert form["refresh_token"] == ["refresh-token"]
+            return FakeResponse({"access_token": "temporary-access-token"})
+        assert request.full_url == "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+        assert request.get_header("Authorization") == "Bearer temporary-access-token"
+        payload = json.loads(request.data.decode("utf-8"))
+        encoded = payload["raw"]
+        decoded = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+        message = message_from_bytes(decoded)
+        assert message["From"] == "merrimanvalleypizza@gmail.com"
+        assert message["To"] == "recipient@example.com"
+        assert message["Subject"] == "Test subject"
+        assert message.get_payload() == "Test body\n"
+        return FakeResponse({"id": "gmail-message-id"})
+
+    monkeypatch.setattr("app.routes.urllib.request.urlopen", fake_urlopen)
+    with app.app_context():
+        assert send_notice("recipient@example.com", "Test subject", "Test body") is True
+    assert len(calls) == 2
+
+
+def test_send_notice_returns_false_when_gmail_api_is_not_configured(app, monkeypatch):
+    from app.routes import send_notice
+
+    for key in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("MAIL_FROM", "merrimanvalleypizza@gmail.com")
+    with app.app_context():
+        assert send_notice("recipient@example.com", "Subject", "Body") is False
