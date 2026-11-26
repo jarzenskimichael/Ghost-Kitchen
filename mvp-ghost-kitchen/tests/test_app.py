@@ -244,6 +244,7 @@ def test_single_monday_application_approval_and_insurance_certificate(app, clien
             "license_info": "Licensed",
             "insurance_info": "General liability coverage",
             "insurance_carrier": "Test Mutual",
+            "insurance_start_date": date.today().isoformat(),
             "insurance_policy_number": "POL-123",
             "insurance_coverage": "$1,000,000",
             "insurance_expires_on": "2027-12-31",
@@ -375,6 +376,8 @@ def test_email_only_application_flow_has_no_sms_opt_in(app, client, monkeypatch)
             "equipment": "Standard equipment",
             "license_info": "In progress",
             "insurance_info": "Insured",
+            "insurance_carrier": "Test Mutual",
+            "insurance_start_date": date.today().isoformat(),
         },
     )
     assert response.status_code == 302
