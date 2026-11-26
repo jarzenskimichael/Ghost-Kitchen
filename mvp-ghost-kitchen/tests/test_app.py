@@ -299,6 +299,50 @@ def test_single_monday_application_approval_and_insurance_certificate(app, clien
         assert insurance.certificate_data == b"updated certificate"
 
 
+def test_application_is_limited_to_two_mondays_per_calendar_month(app, client):
+    with app.app_context():
+        today = date.today()
+        next_month = date(today.year + (today.month == 12), today.month % 12 + 1, 1)
+        first_monday = next_month + timedelta(days=(7 - next_month.weekday()) % 7)
+        dates = [first_monday, first_monday + timedelta(days=14), first_monday + timedelta(days=21)]
+        slots = [MondaySlot(monday_date=value) for value in dates]
+        db.session.add_all(slots)
+        db.session.commit()
+        slot_ids = [slot.id for slot in slots]
+
+    common_form = {
+        "owner_name": "Test Owner",
+        "email": "monthly@example.com",
+        "phone": "3305550111",
+        "business_type": "Food truck",
+        "description": "Test business",
+        "concept": "Test concept",
+        "menu": "Test menu",
+        "equipment": "Test equipment",
+        "license_info": "Licensed",
+        "insurance_carrier": "Test Mutual",
+        "insurance_start_date": date.today().isoformat(),
+    }
+
+    rejected = client.post(
+        "/apply",
+        data={**common_form, "business_name": "Three Mondays",
+              "preferred_mondays": [str(value) for value in slot_ids]},
+    )
+    assert rejected.status_code == 200
+    with app.app_context():
+        assert Application.query.filter_by(business_name="Three Mondays").count() == 0
+
+    accepted = client.post(
+        "/apply",
+        data={**common_form, "business_name": "Two Mondays",
+              "preferred_mondays": [str(slot_ids[0]), str(slot_ids[1])]},
+    )
+    assert accepted.status_code == 302
+    with app.app_context():
+        assert Application.query.filter_by(business_name="Two Mondays").count() == 1
+
+
 def test_public_branding_uses_merriman_valley_pizza(client):
     for path in ("/", "/apply", "/terms", "/privacy"):
         page = client.get(path).get_data(as_text=True)
