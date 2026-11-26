@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block title %}Apply{% endblock %}{% block content %}
-<section class="page-hero compact"><p class="eyebrow">YOUR MONDAY STARTS HERE</p><h1>Apply to the<br><em>Ghost Kitchen.</em></h1><p>Tell us what you're building. Applications are reviewed by Merriman Valley Pizza, the business operating the MVP Ghost Kitchen. Submitting this form does not reserve a date.</p></section>
+<section class="page-hero compact"><p class="eyebrow">YOUR MONDAY STARTS HERE</p><h1>Apply to the<br><em>Ghost Kitchen.</em></h1><p>Tell us about your business, your food concept, and what you'd like to bring to the MVP Ghost Kitchen. We look forward to learning more about you.</p></section>
 <section class="section form-section"><div class="form-intro"><h2>Business application</h2><p class="muted">Fields marked * are required. Pricing is <strong>${{ rental_rate }} for one Monday</strong> or <strong>${{ rotation_rate }} for two consecutive Mondays</strong>.</p></div>
 <form method="post" enctype="multipart/form-data" class="application-form">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
