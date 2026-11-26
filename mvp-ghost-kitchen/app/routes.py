@@ -555,6 +555,14 @@ def weekly_print():
 def admin_application(application_id):
     person = Application.query.get_or_404(application_id)
     monday_slots = get_monday_slots()
+    insurance_record = person.insurance_record
+    insurance_checklist = {
+        "carrier": bool(insurance_record and insurance_record.carrier),
+        "policy_number": bool(insurance_record and insurance_record.policy_number),
+        "coverage": bool(insurance_record and insurance_record.coverage_amount),
+        "expiration": bool(insurance_record and insurance_record.expires_on),
+        "certificate": bool(insurance_record and insurance_record.certificate_data),
+    }
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -712,6 +720,7 @@ def admin_application(application_id):
     return render_template(
         "admin_application.html", person=person, monday_slots=monday_slots,
         requested_monday_ids={item.slot_id for item in MondayRequest.query.filter_by(application_id=person.id).all()},
+        insurance_checklist=insurance_checklist,
         expected_total=(rental_total_for_dates([slot.monday_date for slot in person.monday_slots])
                         if person.monday_slots else
                         rental_total_for_dates([item.slot.monday_date for item in person.monday_requests if item.slot])
