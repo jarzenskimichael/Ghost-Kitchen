@@ -59,7 +59,7 @@ The local database is created automatically. It uses SQLite by default.
    - `BUSINESS_NAME`: Merriman Valley Pizza
    - `RENTAL_RATE`: 150
    - `TIMEZONE`: America/New_York
-   - Optional email settings: `SMTP_HOST`, `SMTP_PORT` (usually 587), `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, and `ORGANIZER_EMAIL`
+   - Gmail API email settings: `MAIL_FROM`, `ORGANIZER_EMAIL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REFRESH_TOKEN`
 5. Deploy. Visit `/admin/login` and sign in with the `ADMIN_PASSWORD`.
 
 The included `render.yaml` defines a web service and a small PostgreSQL database. Confirm current Render plan pricing before provisioning.
@@ -79,9 +79,32 @@ Before opening applications:
 - Set a strong `SECRET_KEY` and `ADMIN_PASSWORD`.
 - Test application submission, approval, date assignment, publishing, and payment tracking.
 
+## Email notifications
+
+Email notifications use the Gmail API over HTTPS (not SMTP). Configure the following environment variables on the existing Render web service:
+
+- `MAIL_FROM`: `merrimanvalleypizza@gmail.com`
+- `ORGANIZER_EMAIL`: where organizer alerts should be delivered
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: OAuth client credentials
+- `GOOGLE_REFRESH_TOKEN`: long-lived OAuth refresh token authorized for Gmail sending
+
+### Set up Gmail API credentials
+
+1. In Google Cloud Console, create/select a project and enable **Gmail API**.
+2. Configure the OAuth consent screen. Add the Google account that owns `merrimanvalleypizza@gmail.com` as a test user while testing.
+3. Create an OAuth client ID of type **Web application**. Add `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+4. Open [Google OAuth 2.0 Playground](https://developers.google.com/oauthplayground). Open its settings (gear), enable **Use your own OAuth credentials**, and enter the client ID and client secret.
+5. In Step 1, enter the scope `https://www.googleapis.com/auth/gmail.send`, authorize the account `merrimanvalleypizza@gmail.com`, and grant permission.
+6. In Step 2, exchange the authorization code for tokens and copy the **refresh token**.
+7. Add the five environment variables above to the existing Render service's Environment page, then redeploy.
+
+Keep the client secret and refresh token private. Do not paste them into chat, GitHub, source code, or logs. The Gmail API `gmail.send` scope permits sending email on behalf of the authorized account; it does not grant mailbox-reading access. Google classifies this as a sensitive scope. If the OAuth consent screen remains in **Testing** mode, refresh tokens for Gmail scopes expire after 7 days; for ongoing production use, move the consent configuration to **In production** (Google may show an unverified-app warning or require verification depending on the app's use).
+
+The organizer Settings page includes a test-email action. A successful result means Google accepted the send request; check the recipient inbox and spam folder for actual receipt.
+
 ## Current payment behavior
 
-The app tracks payment status manually (unpaid, invoiced, paid, refunded). It does not collect card payments. Optional SMTP notifications are sent for new applications and key review decisions when SMTP environment variables are configured.
+The app tracks payment status manually (unpaid, invoiced, paid, refunded). It does not collect card payments. Email notifications are sent through the Gmail API when the OAuth environment variables are configured.
 
 ## Routes
 
