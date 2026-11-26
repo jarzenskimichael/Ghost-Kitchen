@@ -364,6 +364,20 @@ def apply():
                 flash("One or more selected Mondays are no longer available. Please choose again.", "error")
                 return render_template("apply.html", monday_slots=choices, form=request.form)
 
+        # Limit each application to two requested Mondays per calendar month.
+        # This also covers legacy rotation selections.
+        selected_month_counts = {}
+        for slot in selected_slots:
+            month_key = (slot.monday_date.year, slot.monday_date.month)
+            selected_month_counts[month_key] = selected_month_counts.get(month_key, 0) + 1
+        if any(count > 2 for count in selected_month_counts.values()):
+            flash(
+                "You may select no more than two Mondays in any calendar month. "
+                "Choose two dates in that month, or fewer.",
+                "error",
+            )
+            return render_template("apply.html", monday_slots=choices, form=request.form)
+
         photo_name = None
         upload = request.files.get("food_photo")
         if upload and upload.filename:
