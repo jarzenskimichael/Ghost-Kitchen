@@ -839,6 +839,32 @@ def clear_rotation(rotation_id):
     return redirect(url_for("main.admin_rotations"))
 
 
+@bp.route("/admin/settings/test-email", methods=["POST"])
+@admin_required
+def admin_test_email():
+    recipient = request.form.get("test_email", "").strip()
+    if (
+        not recipient
+        or recipient.count("@") != 1
+        or any(char.isspace() for char in recipient)
+        or "." not in recipient.rsplit("@", 1)[-1]
+    ):
+        flash("Enter a valid email address for the test message.", "error")
+        return redirect(url_for("main.admin_settings"))
+
+    sent = send_notice(
+        recipient,
+        "Merriman Valley Pizza Ghost Kitchen — test email",
+        "This is a test email from the Merriman Valley Pizza Ghost Kitchen "
+        "application. Gmail email delivery is configured and working.",
+    )
+    if sent:
+        flash(f"Test email sent to {recipient}. Check the inbox and spam folder.", "success")
+    else:
+        flash("Test email could not be sent. Check the Render application logs for the SMTP error.", "error")
+    return redirect(url_for("main.admin_settings"))
+
+
 @bp.route("/admin/settings", methods=["GET", "POST"])
 @admin_required
 def admin_settings():
