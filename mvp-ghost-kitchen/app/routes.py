@@ -894,7 +894,7 @@ def admin_test_email():
     if sent:
         flash(f"Test email sent to {recipient}. Check the inbox and spam folder.", "success")
     else:
-        flash("Test email could not be sent. Check the Render application logs for the SMTP error.", "error")
+        flash("Test email could not be sent. Check the Render application logs for the Gmail API error.", "error")
     return redirect(url_for("main.admin_settings"))
 
 
