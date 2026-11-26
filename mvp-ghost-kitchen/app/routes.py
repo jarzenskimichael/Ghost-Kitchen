@@ -3,7 +3,11 @@ import mimetypes
 from io import BytesIO, StringIO
 import secrets
 import csv
-import smtplib
+import json
+import base64
+import urllib.error
+import urllib.request
+from urllib.parse import urlencode
 from email.message import EmailMessage
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -21,11 +25,28 @@ bp = Blueprint("main", __name__)
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
 
 
+def _gmail_api_post(url, data, headers=None):
+    """POST JSON or form data to Google over HTTPS and return decoded JSON."""
+    request = urllib.request.Request(url, data=data, headers=headers or {}, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            return json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Google API request failed (HTTP {error.code}): {detail}") from error
+
+
 def send_notice(to_address, subject, body):
-    """Send optional SMTP email. If SMTP is not configured, keep the app usable."""
-    host = os.environ.get("SMTP_HOST")
-    sender = os.environ.get("MAIL_FROM")
-    if not host or not sender or not to_address:
+    """Send email through the Gmail API using an OAuth refresh token."""
+    sender = os.environ.get("MAIL_FROM", "").strip()
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN", "").strip()
+    if not all((sender, client_id, client_secret, refresh_token, to_address)):
+        current_app.logger.warning(
+            "Gmail API email is not configured; set MAIL_FROM, GOOGLE_CLIENT_ID, "
+            "GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN."
+        )
         return False
 
     message = EmailMessage()
@@ -33,22 +54,34 @@ def send_notice(to_address, subject, body):
     message["From"] = sender
     message["To"] = to_address
     message.set_content(body)
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii").rstrip("=")
 
     try:
-        port = int(os.environ.get("SMTP_PORT", "587"))
-        use_ssl = os.environ.get("SMTP_USE_SSL", "false").lower() == "true"
-        smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
-        with smtp_class(host, port, timeout=20) as smtp:
-            if not use_ssl:
-                smtp.starttls()
-            username = os.environ.get("SMTP_USER")
-            password = os.environ.get("SMTP_PASSWORD")
-            if username and password:
-                smtp.login(username, password)
-            smtp.send_message(message)
+        token_response = _gmail_api_post(
+            "https://oauth2.googleapis.com/token",
+            urlencode({
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            }).encode("utf-8"),
+            {"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        access_token = token_response.get("access_token")
+        if not access_token:
+            raise RuntimeError("Google OAuth token response did not include an access token.")
+
+        _gmail_api_post(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+            json.dumps({"raw": raw_message}).encode("utf-8"),
+            {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+        )
         return True
     except Exception:
-        current_app.logger.exception("Unable to send ghost kitchen email notification")
+        current_app.logger.exception("Unable to send Ghost Kitchen email through Gmail API")
         return False
 
 
